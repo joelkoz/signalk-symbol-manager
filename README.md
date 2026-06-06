@@ -98,25 +98,25 @@ http://localhost:3000/signalk-symbol-manager/
 
 ## Symbol Names
 
-Symbols use a source-qualified id:
+Symbols use a namespace-qualified reference:
 
 ```text
-<$source>:<id>
+<namespace>:<id>
 ```
 
-This plugin's `$source` value is:
+This plugin's default namespace for user-managed symbols is:
 
 ```text
-signalk-symbol-manager
+user
 ```
 
-`$source` is not a user-facing setting. It is the plugin id so that symbols from
-different providers do not collide.
+`namespace` is symbol metadata used by consumers to look up symbols and resolve
+name collisions. It must match `[A-Za-z0-9_]+`.
 
 For example:
 
 ```text
-signalk-symbol-manager:dive-site
+user:dive-site
 ```
 
 Consumer applications may also support unqualified names such as:
@@ -126,8 +126,13 @@ dive-site
 ```
 
 When a symbol name is unqualified, the consumer decides the search order. A
-qualified name is preferred when you want to guarantee that a specific provider's
-symbol is used.
+qualified name is preferred when you want to guarantee that a specific namespace
+is used.
+
+The Symbol Manager resource provider keys symbols by the qualified
+`namespace:id` form. If it receives an unqualified local id such as `dive-site`,
+it returns a symbol only when exactly one managed symbol has that local id. If
+multiple namespaces contain the same local id, the lookup is ambiguous.
 
 ## SVG Safety
 

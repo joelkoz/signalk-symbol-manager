@@ -96,7 +96,7 @@ Signal K requires all four methods for provider registration, but the first MVP
 must treat the resource-provider surface as read-only:
 
 - `listResources` must return the managed symbol collection.
-- `getResource` must return one managed symbol by canonical resource id.
+- `getResource` must return one managed symbol by resource id.
 - `setResource` must reject and must not mutate the symbol library.
 - `deleteResource` must reject and must not mutate the symbol library.
 
@@ -104,40 +104,63 @@ Symbol creation, upload, editing, and deletion must be implemented through the
 Symbol Manager plugin API and web UI, not through the public resources API.
 
 The resource collection returned by `listResources` must be keyed by canonical
-symbol reference:
+namespace-qualified resource id:
 
 ```text
-<$source>:<id>
+<namespace>:<id>
 ```
 
-For this plugin, the `$source` value is:
+For this plugin, the default symbol namespace is:
 
 ```text
-signalk-symbol-manager
+user
 ```
 
-`$source` must be the Signal K plugin/provider id. It is not user configurable
-and must not be exposed as a normal end-user setting.
+`namespace` is symbol metadata used by consumers for symbol lookup and collision
+resolution. It is separate from Signal K `$source` response metadata.
+
+Namespace rules:
+
+- `namespace` is required.
+- `namespace` must match `[A-Za-z0-9_]+`.
+
+The plugin may allow the user to choose a different namespace, but the default
+for user-managed Symbol Manager symbols must be `user`.
 
 Example resource key:
 
 ```text
-signalk-symbol-manager:dive-site
+user:dive-site
 ```
 
-`getResource` must accept the canonical resource id. For this plugin that means
-ids such as:
+The resource key is also the consumer symbol reference.
+
+`getResource` must accept the canonical namespace-qualified resource id. For
+this plugin that means ids such as:
 
 ```text
-signalk-symbol-manager:dive-site
+user:dive-site
 ```
 
-The plugin may internally parse that value into source and local id. Asset routes
-may use local ids as long as the public resource API remains canonical.
+The plugin must also handle an unqualified local id request as a convenience
+lookup:
+
+```text
+dive-site
+```
+
+An unqualified lookup must succeed only when exactly one symbol with that local
+id exists in the Symbol Manager library. If more than one namespace contains the
+same local id, the provider must reject the unqualified lookup as ambiguous.
+
+Asset routes may use local ids only where the route can unambiguously identify
+the symbol. Public resource API keys must use the canonical `namespace:id`
+resource id.
 
 All symbols managed by the first MVP originate from this plugin. The provider
-must not accept writes for other `$source` values and must not act as a generic
-multi-provider symbol store.
+must not act as a generic multi-provider symbol store. If two providers expose
+the same `namespace:id` consumer reference, the winning symbol is undefined for
+the first version.
 
 ## Symbol Resource Shape
 
@@ -146,6 +169,7 @@ Each symbol resource returned by the provider must include:
 ```json
 {
   "id": "dive-site",
+  "namespace": "user",
   "$source": "signalk-symbol-manager",
   "timestamp": "2026-06-05T12:30:00.000Z",
   "name": "Dive Site",
@@ -156,7 +180,16 @@ Each symbol resource returned by the provider must include:
 
 Create/update payloads do not need to include `$source` or `timestamp`. The
 plugin derives `$source` from its provider id and assigns `timestamp` as resource
-response metadata.
+response metadata. `namespace` is provider-owned symbol payload metadata and
+must be stored with the symbol.
+
+Required symbol payload fields:
+
+- `id`
+- `namespace`
+- `name`
+- `mediaType`
+- `url`
 
 Recommended fields:
 
@@ -190,7 +223,7 @@ Symbols without map-marker roles may omit them.
 The object key must match:
 
 ```text
-${$source}:${id}
+resourceKey === `${namespace}:${id}`
 ```
 
 ## Data Storage
@@ -204,6 +237,7 @@ symbols, uploaded files, generated thumbnails, or SQLite databases to git.
 The SQLite datastore must support:
 
 - stable symbol ids
+- namespace metadata
 - display names and descriptions
 - sanitized SVG file references
 - role/tag metadata
@@ -213,9 +247,6 @@ The SQLite datastore must support:
 Sanitized SVG assets should be stored as files under the plugin data directory,
 not in the source tree. SQLite should store metadata and asset file references;
 it should not be treated as a general multi-provider symbol store.
-
-The datastore must not support arbitrary source values. All symbols
-managed by this plugin use the plugin id as `$source`.
 
 ## Web App
 
@@ -525,8 +556,11 @@ chart-portrayal implementation spec.
 
 When implementation begins, verification should include:
 
-- `GET /signalk/v2/api/resources/symbols` returns canonical symbol keys.
+- `GET /signalk/v2/api/resources/symbols` returns namespace-qualified symbol keys.
 - `GET /signalk/v2/api/resources/symbols/:resourceId` returns the requested symbol.
+- unqualified `GET /signalk/v2/api/resources/symbols/:resourceId` succeeds only
+  when the local id is unique and rejects ambiguous local ids.
+- returned symbols include required `namespace` metadata.
 - `POST`, `PUT`, and `DELETE` through `/signalk/v2/api/resources/symbols` reject
   without mutating the symbol library.
 - SVG assets are served with the correct content type.
@@ -536,11 +570,15 @@ When implementation begins, verification should include:
 
 ## Test Plan
 
-- Unit tests for id parsing, canonical key generation, SQLite metadata operations, SVG file writes, and sanitizer rejects.
+- Unit tests for namespace validation, canonical key generation, unqualified id
+  ambiguity handling, SQLite metadata operations, SVG file writes, and sanitizer
+  rejects.
 - Integration tests against a local Signal K server:
   - provider registration appears under `/resources/symbols/_providers`
-  - `GET /signalk/v2/api/resources/symbols` returns canonical keys
+  - `GET /signalk/v2/api/resources/symbols` returns namespace-qualified keys
   - `GET /signalk/v2/api/resources/symbols/:resourceId` returns one symbol
+  - unqualified resource lookup rejects ambiguous local ids
+  - returned symbols include required `namespace` metadata
   - resource-provider `POST`, `PUT`, and `DELETE` reject without mutating data
   - SVG route returns `Content-Type: image/svg+xml`
   - plugin API create/update/delete require authorization

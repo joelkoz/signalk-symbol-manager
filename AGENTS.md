@@ -24,7 +24,9 @@ Resource Provider methods because Signal K requires them, but only
 `listResources` and `getResource` should return symbol data. `setResource` and
 `deleteResource` must reject without mutating data. Symbol creation, upload,
 editing, and deletion must go through the Symbol Manager plugin API and web UI.
-All managed symbols use `$source: signalk-symbol-manager`.
+All managed symbols use `namespace: user` by default. `$source` remains Signal K
+resource response metadata for the provider plugin and is not the symbol
+namespace.
 
 The manager UI must be packaged as a Signal K WebApp: put the compiled UI in
 `public/`, include the `signalk-webapp` package keyword, and let Signal K Server
@@ -50,20 +52,21 @@ values and should be edited with checkboxes. Tags are free-form search/filter
 metadata and should be edited with a maintained React tag-input component found
 during implementation, not a hand-rolled tag editor.
 
-Preserve the source-qualified id contract:
+Preserve the namespace-qualified symbol reference contract:
 
 ```text
-<$source>:<id>
+<namespace>:<id>
 ```
 
-The plugin's `$source` value is:
+The plugin's default symbol namespace is:
 
 ```text
-signalk-symbol-manager
+user
 ```
 
-`$source` is not user configurable. It is the Signal K plugin/provider id and
-is used for internal conflict resolution.
+`namespace` is symbol metadata used by consumers for symbol lookup and collision
+resolution. It must match `[A-Za-z0-9_]+`. `$source` is separate Signal K
+`Resource<T>` metadata and remains the provider plugin id.
 
 Do not implement native S-57/ENC portrayal changes in this plugin. S-57/ENC
 chart-symbol catalog support is a separate chart portrayal problem, not part of
