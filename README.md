@@ -58,6 +58,8 @@ registered through that existing mechanism.
 - Upload existing SVG files.
 - Rename, duplicate, delete, and organize symbols.
 - Preview symbols at common map-marker and UI sizes.
+- Persist scale and anchor metadata for symbols intended for Freeboard-SK map
+  marker use.
 - Start new symbols from templates, including:
   - a Map note template matching Freeboard-SK's default note marker shape
   - an empty canvas

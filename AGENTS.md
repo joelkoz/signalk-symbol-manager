@@ -33,6 +33,13 @@ user-managed symbol metadata. Store sanitized SVG assets in the plugin data
 directory and index them from SQLite; do not commit uploaded SVG files,
 generated thumbnails, or SQLite databases to git.
 
+The generic symbol resource contract keeps `scale` and `anchor` optional for
+other providers, but this reference plugin must implement recommended map-marker
+metadata. Every managed symbol with `note`, `waypoint`, or `map-marker` role must
+persist and emit `scale` and `anchor`. Templates must provide defaults, and
+direct SVG upload must require the user to confirm or edit those values before
+the symbol is offered for map-marker use.
+
 Preserve the source-qualified id contract:
 
 ```text

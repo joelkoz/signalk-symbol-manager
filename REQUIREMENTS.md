@@ -161,6 +161,20 @@ Recommended fields:
 - `scale`
 - `anchor`
 
+For the generic Signal K symbol resource contract, `scale` and `anchor` are
+optional. For this reference plugin, they are required for every managed symbol
+that is intended for map-marker use. A symbol is map-marker-capable when its
+`roles` include any of:
+
+```text
+note
+waypoint
+map-marker
+```
+
+For those symbols, the provider must persist and emit both `scale` and `anchor`.
+Symbols without map-marker roles may omit them.
+
 The object key must match:
 
 ```text
@@ -273,8 +287,10 @@ A possible `Waypoint` reference asset is:
 ../freeboard-extension-spec/waypoint-example.svg
 ```
 
-The template should also pre-populate the "roles" and "tags" structure with
-defaults specified in the template definition `.json` file.
+The template should also pre-populate the `roles`, `tags`, `scale`, and `anchor`
+structure with defaults specified in the template definition `.json` file.
+Templates with `note`, `waypoint`, or `map-marker` roles must define `scale` and
+`anchor`.
 
 ### Freboard Reference Information
 
@@ -307,8 +323,14 @@ therefore render the symbol as:
 ```text
 displayed width = source SVG width * scale
 displayed height = source SVG height * scale
-map point = pixel anchor after scale is applied
+map point = source pixel anchor, displayed at anchor * scale from the rendered top-left
 ```
+
+Freeboard-SK can technically render an icon without explicit `scale` and
+`anchor` because OpenLayers supplies defaults, but those defaults do not preserve
+Freeboard's expected marker size or point placement. The Symbol Manager must
+therefore treat `scale` and `anchor` as required metadata for symbols that can be
+used as notes, waypoints, or other map markers.
 
 ### Direct upload
 
@@ -317,6 +339,11 @@ CRUD list should support a direct upload (with sanitation step) to add
 a symbol directly to the list, bypassing the editor. This allows more
 complex symbols that would break in the editor to be added to the symbol
 library.
+
+Direct upload must still collect or confirm map-marker metadata. If the uploaded
+symbol is assigned `note`, `waypoint`, or `map-marker` role, the save flow must
+require valid `scale` and `anchor` values before the symbol is exposed through
+the resource provider.
 
 
 ### SVG Editor View
@@ -335,7 +362,7 @@ A "Properties" panel where the user can edit:
      * should be assisgned via a set of one or more checkboxes of
        fixed value (see full spec). A checkbox with "custom" and a text input 
        for free form text
-  * editing map-marker metadata such as anchor point and scale
+  * editing map-marker metadata: `scale` and `anchor`
  
 - Shape/Text specific properties (when an individual shape or text is selected)
 
