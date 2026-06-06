@@ -57,7 +57,9 @@ code unless instructed by the user.
 - Do not mount the manager UI with `registerWithRouter()`.
 - Use `registerWithRouter()` only for plugin-owned API and asset routes under
   `/plugins/signalk-symbol-manager/...`.
-- Store metadata in SQLite and sanitized SVG files under `app.getDataDirPath()`.
+- Store user-managed symbol metadata in Node's integrated SQLite database under
+  `app.getDataDirPath()`, and store sanitized SVG asset files under the same
+  plugin data directory.
 - Provide routes:
   - `GET /plugins/signalk-symbol-manager/api/symbols`
   - `GET /plugins/signalk-symbol-manager/api/symbols/:id`
@@ -151,22 +153,26 @@ ${$source}:${id}
 
 ## Data Storage
 
-The plugin may use Node.js 22.5+ integrated SQLite support for metadata and
-symbol storage.
+The plugin must use Node.js 22.5+ integrated `node:sqlite` support for
+user-managed symbol metadata persistence.
 
 Runtime data must live in the Signal K plugin data directory. Do not commit user
 symbols, uploaded files, generated thumbnails, or SQLite databases to git.
 
-The datastore should support:
+The SQLite datastore must support:
 
 - stable symbol ids
 - display names and descriptions
-- SVG content or SVG file references
+- sanitized SVG file references
 - role/tag metadata
 - scale and anchor metadata
 - created/updated timestamps
 
-The datastore does not need to support arbitrary source values. All symbols
+Sanitized SVG assets should be stored as files under the plugin data directory,
+not in the source tree. SQLite should store metadata and asset file references;
+it should not be treated as a general multi-provider symbol store.
+
+The datastore must not support arbitrary source values. All symbols
 managed by this plugin use the plugin id as `$source`.
 
 ## Web App

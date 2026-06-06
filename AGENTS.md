@@ -21,8 +21,10 @@ serve it at `/signalk-symbol-manager/`. Do not serve the UI from
 `/plugins/signalk-symbol-manager/...`.
 
 Keep user-created symbol data out of git. Runtime data should live in the
-Signal K plugin data directory, with SQLite used only for user-managed library
-metadata and SVG storage/indexing as needed.
+Signal K plugin data directory. Use Node's integrated `node:sqlite` support for
+user-managed symbol metadata. Store sanitized SVG assets in the plugin data
+directory and index them from SQLite; do not commit uploaded SVG files,
+generated thumbnails, or SQLite databases to git.
 
 Preserve the source-qualified id contract:
 

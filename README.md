@@ -20,6 +20,9 @@ This plugin requires:
 - Node.js 22.5 or newer.
 - A symbol-resource-aware consumer app.
 
+Node.js 22.5+ is required because the plugin uses Node's integrated
+`node:sqlite` support for user-managed symbol metadata.
+
 The package is both a normal Signal K server plugin and a Signal K WebApp. Its
 `package.json` must include both `signalk-node-server-plugin` and
 `signalk-webapp` keywords. Signal K Server serves the compiled UI from
