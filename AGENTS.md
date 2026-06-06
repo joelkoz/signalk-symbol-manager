@@ -9,6 +9,11 @@ Before changing or debugging this repository, read:
 This project currently contains implementation-spec documents only. Do not add
 implementation code until the user explicitly starts the implementation phase.
 
+Symbol Manager implementation work is standalone. Use a
+`symbol-resource-provider` branch in this repository only. Do not create
+branches, edit files, or commit changes in `../signalk-server-node` or
+`../freeboard-sk` while working on this plugin.
+
 The plugin must remain a normal Signal K server plugin and Signal K Plugin
 WebApp. It should not require a custom Signal K server build for end users. The
 Resource Provider API already supports custom resource types, and this plugin

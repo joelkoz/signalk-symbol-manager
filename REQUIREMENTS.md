@@ -25,7 +25,12 @@ The authoritative implementation spec is:
 ../freeboard-extension-spec/rfc-symbol-resource-provider.md
 ```
 
-Execution should first create `symbol-resource-provider` branch in the git project.
+Symbol Manager implementation work is standalone. Use a
+`symbol-resource-provider` branch in this repository only.
+
+This plugin repository is independent from the Signal K server and Freeboard-SK
+repositories. Do not create branches, edit files, or commit changes in
+`../signalk-server-node` or `../freeboard-sk` while implementing this plugin.
 
 The plugin UI will use React + Fabric.js. Keep upload/source editing as fallback for complex SVGs. 
 
