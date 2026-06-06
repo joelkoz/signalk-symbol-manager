@@ -62,8 +62,10 @@ registered through that existing mechanism.
   marker use.
 - Edit roles with checkboxes and tags with a dedicated React tag editor.
 - Start new symbols from templates, including:
-  - a Map note template matching Freeboard-SK's default note marker shape
-  - an empty canvas
+  - a POI template matching Freeboard-SK's default note marker shape
+  - a flag template
+  - a waypoint template
+  - a blank canvas
 - Serve symbols through the Signal K Resource Provider API as a read-only
   discovery surface.
 
