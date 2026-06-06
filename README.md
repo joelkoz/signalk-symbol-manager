@@ -60,6 +60,7 @@ registered through that existing mechanism.
 - Preview symbols at common map-marker and UI sizes.
 - Persist scale and anchor metadata for symbols intended for Freeboard-SK map
   marker use.
+- Edit roles with checkboxes and tags with a dedicated React tag editor.
 - Start new symbols from templates, including:
   - a Map note template matching Freeboard-SK's default note marker shape
   - an empty canvas

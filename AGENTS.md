@@ -40,6 +40,11 @@ persist and emit `scale` and `anchor`. Templates must provide defaults, and
 direct SVG upload must require the user to confirm or edit those values before
 the symbol is offered for map-marker use.
 
+Use separate UI controls for roles and tags. Roles are controlled advisory
+values and should be edited with checkboxes. Tags are free-form search/filter
+metadata and should be edited with a maintained React tag-input component found
+during implementation, not a hand-rolled tag editor.
+
 Preserve the source-qualified id contract:
 
 ```text

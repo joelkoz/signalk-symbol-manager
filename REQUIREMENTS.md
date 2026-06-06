@@ -161,6 +161,13 @@ Recommended fields:
 - `scale`
 - `anchor`
 
+Roles and tags have different semantics:
+
+- `roles` are controlled advisory usage categories. The UI must present the
+  known role vocabulary as checkboxes.
+- `tags` are free-form search/filter labels. The UI must use a maintained React
+  tag-input/tag-editor component for adding, removing, and editing tags.
+
 For the generic Signal K symbol resource contract, `scale` and `anchor` are
 optional. For this reference plugin, they are required for every managed symbol
 that is intended for map-marker use. A symbol is map-marker-capable when its
@@ -358,10 +365,14 @@ A "Properties" panel where the user can edit:
 
 - Symbol wide properties (when an individual shape is NOT selected)
   * id, name, description
-  * roles and tags
-     * should be assisgned via a set of one or more checkboxes of
-       fixed value (see full spec). A checkbox with "custom" and a text input 
-       for free form text
+  * roles
+     * assigned with checkboxes for the known role vocabulary
+     * role checkboxes must include `note`, `waypoint`, `region`, `button`,
+       `alert`, `logbook`, `map-marker`, and `vector-style-icon`
+  * tags
+     * assigned with a dedicated React tag-input/tag-editor component
+     * support adding tags with keyboard delimiters, removing tags, preventing
+       duplicates, and preserving tag order as entered
   * editing map-marker metadata: `scale` and `anchor`
  
 - Shape/Text specific properties (when an individual shape or text is selected)
@@ -407,6 +418,13 @@ is reached, the "top" shape is selected again.
 ## Software stack
 
 The plugin UI will use React + Fabric.js. Fabric.js is the better fit for lightweight map-symbol creation than SVG-Edit because we can expose only the small tool surface needed for icons. Keep upload/source editing as fallback for complex SVGs.
+
+For tag editing, use an existing maintained React tag-input component rather
+than building a custom tag editor. During implementation, check current package
+health and choose a component that supports TypeScript or clean TypeScript
+wrapping, keyboard entry, tag removal, uniqueness, and accessible labels. Current
+candidates to evaluate include `react-tag-input-component`, `react-tag-input`,
+and `react-tag-autocomplete`.
 
 For complex features, a web search of external open source libraries should
 be checked and used before writing new code (e.g. [DOMPurify](https://github.com/cure53/dompurify) as a candidate for SVG sanitation)
