@@ -14,6 +14,13 @@ WebApp. It should not require a custom Signal K server build for end users. The
 Resource Provider API already supports custom resource types, and this plugin
 should register as a provider for `symbols`.
 
+For the first MVP, the Resource Provider surface is read-only. Implement all four
+Resource Provider methods because Signal K requires them, but only
+`listResources` and `getResource` should return symbol data. `setResource` and
+`deleteResource` must reject without mutating data. Symbol creation, upload,
+editing, and deletion must go through the Symbol Manager plugin API and web UI.
+All managed symbols use `$source: signalk-symbol-manager`.
+
 The manager UI must be packaged as a Signal K WebApp: put the compiled UI in
 `public/`, include the `signalk-webapp` package keyword, and let Signal K Server
 serve it at `/signalk-symbol-manager/`. Do not serve the UI from

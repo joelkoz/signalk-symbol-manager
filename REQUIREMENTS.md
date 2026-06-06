@@ -71,7 +71,8 @@ code unless instructed by the user.
 
 ## Runtime Contract
 
-The plugin must register as a Signal K `symbols` resource provider using:
+The plugin must register as a read-only Signal K `symbols` resource provider
+using:
 
 ```js
 app.registerResourceProvider({ type: 'symbols', methods: ... })
@@ -85,6 +86,17 @@ getResource
 setResource
 deleteResource
 ```
+
+Signal K requires all four methods for provider registration, but the first MVP
+must treat the resource-provider surface as read-only:
+
+- `listResources` must return the managed symbol collection.
+- `getResource` must return one managed symbol by canonical resource id.
+- `setResource` must reject and must not mutate the symbol library.
+- `deleteResource` must reject and must not mutate the symbol library.
+
+Symbol creation, upload, editing, and deletion must be implemented through the
+Symbol Manager plugin API and web UI, not through the public resources API.
 
 The resource collection returned by `listResources` must be keyed by canonical
 symbol reference:
@@ -108,8 +120,8 @@ Example resource key:
 signalk-symbol-manager:dive-site
 ```
 
-`getResource`, `setResource`, and `deleteResource` must accept the canonical
-resource id. For this plugin that means ids such as:
+`getResource` must accept the canonical resource id. For this plugin that means
+ids such as:
 
 ```text
 signalk-symbol-manager:dive-site
@@ -117,6 +129,10 @@ signalk-symbol-manager:dive-site
 
 The plugin may internally parse that value into source and local id. Asset routes
 may use local ids as long as the public resource API remains canonical.
+
+All symbols managed by the first MVP originate from this plugin. The provider
+must not accept writes for other `$source` values and must not act as a generic
+multi-provider symbol store.
 
 ## Symbol Resource Shape
 
@@ -409,9 +425,14 @@ Plugin API and asset routes registered with `registerWithRouter()`:
 The public resource-provider surface remains:
 
 ```text
-/signalk/v2/api/resources/symbols
-/signalk/v2/api/resources/symbols/:resourceId
+GET /signalk/v2/api/resources/symbols
+GET /signalk/v2/api/resources/symbols/:resourceId
 ```
+
+For this plugin, `POST`, `PUT`, and `DELETE` against
+`/signalk/v2/api/resources/symbols` are not supported mutation paths and must
+not change the symbol library. The provider's write methods should reject with a
+clear read-only/not-supported error.
 
 The plugin API routes are for the manager web app. Consumers should prefer the
 Signal K resources API for discovery. The route
@@ -422,8 +443,14 @@ Signal K resources API for discovery. The route
 Read access to symbol resources can be public if the Signal K server permits
 read-only resource access.
 
-Create, update, upload, and delete operations must require appropriate Signal K
-write/admin authorization. Do not allow unauthenticated symbol library mutation.
+Create, update, upload, and delete operations through the plugin API must require
+appropriate Signal K write/admin authorization. Do not allow unauthenticated
+symbol library mutation.
+
+Resource-provider `setResource` and `deleteResource` calls must remain read-only
+rejections even for authenticated users. Authentication can authorize the plugin
+manager API, but it must not turn the resources API into a second mutation path
+for this MVP.
 
 ## Chart and Vector Renderer Notes
 
@@ -450,9 +477,11 @@ When implementation begins, verification should include:
 
 - `GET /signalk/v2/api/resources/symbols` returns canonical symbol keys.
 - `GET /signalk/v2/api/resources/symbols/:resourceId` returns the requested symbol.
+- `POST`, `PUT`, and `DELETE` through `/signalk/v2/api/resources/symbols` reject
+  without mutating the symbol library.
 - SVG assets are served with the correct content type.
 - unsafe SVG upload attempts are rejected or sanitized.
-- create/edit/delete operations require authorization.
+- plugin API create/edit/delete operations require authorization.
 - a symbol-aware consumer app can discover and render a managed symbol.
 
 ## Test Plan
@@ -462,8 +491,9 @@ When implementation begins, verification should include:
   - provider registration appears under `/resources/symbols/_providers`
   - `GET /signalk/v2/api/resources/symbols` returns canonical keys
   - `GET /signalk/v2/api/resources/symbols/:resourceId` returns one symbol
+  - resource-provider `POST`, `PUT`, and `DELETE` reject without mutating data
   - SVG route returns `Content-Type: image/svg+xml`
-  - create/update/delete require authorization
+  - plugin API create/update/delete require authorization
 - UI tests for create, edit, duplicate, upload, delete, role/tag editing, anchor/scale editing, and Fabric.js export.
 
 ## Assumptions And Defaults

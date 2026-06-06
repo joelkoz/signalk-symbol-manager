@@ -9,8 +9,11 @@ The plugin exposes those symbols through the Signal K resources API as:
 /signalk/v2/api/resources/symbols
 ```
 
-Symbol-aware applications can then use the symbols for note icons, waypoint
-icons, map markers, buttons, logs, alerts, or other UI features.
+For the first MVP, this resources API surface is read-only. Symbol-aware
+applications can discover and read symbols there for note icons, waypoint icons,
+map markers, buttons, logs, alerts, or other UI features. Symbol creation,
+upload, editing, and deletion are handled by the Symbol Manager web UI and its
+plugin API routes under `/plugins/signalk-symbol-manager/...`.
 
 ## Requirements
 
@@ -58,7 +61,8 @@ registered through that existing mechanism.
 - Start new symbols from templates, including:
   - a Map note template matching Freeboard-SK's default note marker shape
   - an empty canvas
-- Serve symbols through the Signal K Resource Provider API.
+- Serve symbols through the Signal K Resource Provider API as a read-only
+  discovery surface.
 
 ## Development
 
