@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+*.sqlite
+*.sqlite-*
+symbols/
+coverage/
+public/index.html
+public/assets/
+dist/
+.vite/

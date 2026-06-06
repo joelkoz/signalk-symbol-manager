@@ -161,14 +161,11 @@ managed by this plugin use the plugin id as `$source`.
 
 The plugin must provide a Signal K web app for end users.
 
-The web app must be a list-first CRUD manager for a library of zero or more
-user-defined symbols. It must not open directly into an editor for a single
-symbol. The first screen must show the current symbol list and actions for
-managing that list.
+The web app's main view should be CRUD list manager for a library of zero or more user-defined symbols. 
 
 The list should have the following columns:
 
-- the symbol itself (sized in the same size as the display in Freeboard)
+- the symbol itself (sized in the same display size in Freeboard)
 - The symbol name
 - The symbol description
 - An actions column with icons for Edit and Delete
@@ -186,49 +183,60 @@ The list screen must support:
 The SVG editor must only appear after the user explicitly chooses `New` or
 `Edit`.
 
-When `New` is selected, the user must first choose an initial template before
-the editor appears. The initial template list must include exactly these
-starter choices unless the user approves more:
+### Symbol Templates
 
-- `Map note`
+When `New` is selected, the user must first choose an initial template before
+the editor appears. The initial template list should come from an extensable `.json` file in the source tree that defines the templates to choose from. The initial templates should be:
+
+- `POI`
 - `Flag`
+- `Waypoint`
 - `Blank`
 
-The `Map note` template must visually match the Freeboard-SK POI note marker
-style. The reference asset is:
+The `POI` template should visually match the Freeboard-SK POI note marker
+style, including its anchor point at the tip of the symbol in the lower left. The reference asset is:
 
 ```text
 ../freeboard-sk/src/assets/img/poi/dive-site.svg
 ```
 
 That reference is a red note marker with a white stripe. The Symbol Manager
-`Map note` starter must use the same note-marker shape, but without the white
+`POI` starter must use the same note-marker shape, but without the white
 stripe, so the starter is a plain editable colored note marker. The editor must
 provide a fill color picker that can change the note marker fill color.
 
 
 The `Flag` template should be an asset that appears as a flag.
-The reference asset is:
+One possible reference asset is:
 
 ```text
 ../freeboard-extension-spec/map-flag-example.svg
+```
+
+A possible `Waypoint` reference asset is:
+
+```text
+../freeboard-extension-spec/waypoint-example.svg
+```
+
+The template should also pre-populate the "roles" and "tags" structure with
+defaults specified in the template definition `.json` file.
+
+### Freboard Reference Information
+
+FOR IMPLEMENTATION REFERENCE ONLY!
+
+Freeboard POI icon definitions (i.e. POI) use:
+
+```ts
+scale: 0.65
+anchor: [1, 37]
 ```
 
 Freeboard-SK currently registers POI note icons in:
 
 ```text
 ../freeboard-sk/src/app/modules/icons/poi.ts
-```
-
-### Freboard Reference code
-
-FOR IMPLEMENTATION REFERENCE ONLY!
-
-Freeboard POI icon definitions use:
-
-```ts
-scale: 0.65
-anchor: [1, 37]
 ```
 
 Freeboard-SK builds map image styles in:
@@ -239,7 +247,7 @@ Freeboard-SK builds map image styles in:
 
 The registry creates an OpenLayers `Icon` with the icon path as `src`, applies
 the configured `scale` and `anchor`, and sets `anchorXUnits` and `anchorYUnits`
-to `pixels`. Symbol Manager previews for Freeboard-SK map-note usage must
+to `pixels`. Symbol Manager previews for Freeboard-SK map note usage must
 therefore render the symbol as:
 
 ```text
@@ -248,41 +256,79 @@ displayed height = source SVG height * scale
 map point = pixel anchor after scale is applied
 ```
 
+### Direct upload
+
+The SVG Editor may not be sophisticated enough to render complex SVG. The
+CRUD list should support a direct upload (with sanitation step) to add
+a symbol directly to the list, bypassing the editor. This allows more
+complex symbols that would break in the editor to be added to the symbol
+library.
+
+
 ### SVG Editor View
 
 The editor view should support:
 
-- previewing the symbol at the size it is expected to render in Freeboard-SK,
-  using the symbol's configured `scale` and source SVG dimensions
-- assigning roles and tags
-  - should be assisgned via a set of one or more checkboxes of
-    fixed value (see full spec). A checkbox with "custom" and a text input for
-    free form text
-- editing map-marker metadata such as anchor point and scale
+#### Preview Panel
+A preview panel to view the symbol at the size it is expected to render in Freeboard-SK using the symbol's configured `scale` and source SVG dimensions
+
+#### Properties Panel
+A "Properties" panel where the user can edit:
+
+- Symbol wide properties (when an individual shape is NOT selected)
+  * id, name, description
+  * roles and tags
+     * should be assisgned via a set of one or more checkboxes of
+       fixed value (see full spec). A checkbox with "custom" and a text input 
+       for free form text
+  * editing map-marker metadata such as anchor point and scale
+ 
+- Shape/Text specific properties (when an individual shape or text is selected)
+
+  - Shape type (line, circle, rectangle, arrow, text)
+  - Text content (if a Text shape)
+  - X, Y, W, H
+  - Change color:
+     - outline
+     - foreground
+     - fill
+  - "Import shape" to add additional external SVG to the current image
+
+#### Special handling of "POI" template
+
+When editing POI symbols (i.e. the POI template was selected), the "import shape" should offer the option to
+size and position the imported SVG in to the "square body" area of the
+POI.  The "dive flag" reference POI shape has a white diagonal
+line thru it. The ends of that line represents the corners of the bounding
+box of the "body" area of a POI.
+
+#### Shape selection
+
+The editor should allow a specific shape to be selected by clicking on it.
+Subsequent clicks on the same general area will select the shape "underneath"
+the currently selected shape in Z order. When the bottom of the Z order
+is reached, the "top" shape is selected again.
+
+#### Other useful editing capabilities:
+
+- view/edit raw SVG source
+- zoom editor area
+- resize/scale the entire symbol
+- save back to the symbol library
 - "Anchor point" should be visually represented on the editing screen,
-  allowing a user to move a small icon (that looks like an anchor) to
+  allowing a user to move a small icon to
   the point that is the anchor point. Moving this icon around the image
   will automatically update the "anchor point" metadata. This visual
   representation is "editor only" and should not be made part of the
-  SVG source
+  SVG source. A suggested reference image for this is `../freeboard-extension-spec/boat-anchor-example.svg`
   
+  
+## Software stack
 
 The plugin UI will use React + Fabric.js. Fabric.js is the better fit for lightweight map-symbol creation than SVG-Edit because we can expose only the small tool surface needed for icons. Keep upload/source editing as fallback for complex SVGs.
 
-The SVG editor should be integrated into the web app. It does not need to be a
-full professional vector editor in the first version, but it should allow a user
-to create and adjust practical map-marker symbols without leaving Signal K.
-
-Minimum useful editing capabilities:
-
-- view/edit the SVG source
-- preview rendered output
-- change canvas/viewBox size
-- edit fill and stroke colors
-- add or adjust simple shapes
-- save back to the symbol library
-
-An external SVG upload path must also be supported.
+For complex features, a web search of external open source libraries should
+be checked and used before writing new code (e.g. [DOMPurify](https://github.com/cure53/dompurify) as a candidate for SVG sanitation)
 
 ## SVG Validation and Sanitization
 
@@ -334,7 +380,7 @@ write/admin authorization. Do not allow unauthenticated symbol library mutation.
 
 ## Chart and Vector Renderer Notes
 
-This plugin's first version targets SVG symbols for UI and map overlay markers.
+This plugin's first MVP targets SVG symbols for UI and map overlay markers.
 
 MVT, Mapbox/MapLibre style sprites, and S-57/ENC native chart portrayal are
 renderer-specific. The plugin may eventually generate renderer-specific assets,
