@@ -44,7 +44,19 @@ code unless instructed by the user.
 
 - Scaffold as a normal Signal K plugin and webapp with `signalk-node-server-plugin` and `signalk-webapp` metadata.
 - Use `app.registerResourceProvider({ type: 'symbols', methods })` with all four methods.
-- Serve the manager at `/<package-name>/` from `public/`, and plugin APIs under `/plugins/signalk-symbol-manager/...` via `registerWithRouter()`.
+- Implement the manager UI as a Signal K Plugin WebApp, not as a generic
+  Express-served web app. The package must include both package keywords:
+  `signalk-node-server-plugin` and `signalk-webapp`.
+- Put the built manager UI under `public/`. Signal K Server mounts
+  `public/` automatically at:
+
+  ```text
+  /signalk-symbol-manager/
+  ```
+
+- Do not mount the manager UI with `registerWithRouter()`.
+- Use `registerWithRouter()` only for plugin-owned API and asset routes under
+  `/plugins/signalk-symbol-manager/...`.
 - Store metadata in SQLite and sanitized SVG files under `app.getDataDirPath()`.
 - Provide routes:
   - `GET /plugins/signalk-symbol-manager/api/symbols`
@@ -159,7 +171,27 @@ managed by this plugin use the plugin id as `$source`.
 
 ## Web App
 
-The plugin must provide a Signal K web app for end users.
+The plugin must provide a Signal K Plugin WebApp for end users.
+
+This is a normal Signal K WebApp shipped by the plugin package:
+
+- `package.json` must include the `signalk-webapp` keyword so Signal K Server
+  discovers it as a webapp.
+- The compiled UI must be in `public/`.
+- Signal K Server serves that `public/` directory at `/<package-name>/`.
+- For this package, the manager UI path is:
+
+  ```text
+  /signalk-symbol-manager/
+  ```
+
+- The Signal K Admin UI should list it on the Webapps page using the package
+  metadata. The package should set `signalk.displayName` to `Symbol Manager`.
+- The manager UI should call plugin API routes under
+  `/plugins/signalk-symbol-manager/...` for CRUD, upload, and asset-management
+  operations.
+- `registerWithRouter()` must not serve the compiled UI. It is only for plugin
+  API and asset routes.
 
 The web app's main view should be CRUD list manager for a library of zero or more user-defined symbols. 
 
@@ -351,10 +383,18 @@ Content-Type: image/svg+xml
 
 ## HTTP Routes
 
-Planned routes:
+Signal K WebApp UI route:
 
 ```text
-/plugins/signalk-symbol-manager/
+/signalk-symbol-manager/
+```
+
+This route is not registered manually by the plugin. Signal K Server creates it
+because the package has the `signalk-webapp` keyword and a `public/` directory.
+
+Plugin API and asset routes registered with `registerWithRouter()`:
+
+```text
 /plugins/signalk-symbol-manager/symbols/:id.svg
 /plugins/signalk-symbol-manager/api/symbols
 /plugins/signalk-symbol-manager/api/symbols/:id
@@ -368,7 +408,8 @@ The public resource-provider surface remains:
 ```
 
 The plugin API routes are for the manager web app. Consumers should prefer the
-Signal K resources API for discovery.
+Signal K resources API for discovery. The route
+`/plugins/signalk-symbol-manager/` must not be treated as the manager UI root.
 
 ## Authorization
 

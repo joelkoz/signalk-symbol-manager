@@ -1,6 +1,7 @@
 # Signal K Symbol Manager
 
-Signal K server plugin and web app for managing a custom library of SVG symbols.
+Signal K server plugin and Signal K Plugin WebApp for managing a custom
+library of SVG symbols.
 
 The plugin exposes those symbols through the Signal K resources API as:
 
@@ -18,6 +19,21 @@ This plugin requires:
 - Signal K Server with Resource Provider plugin support.
 - Node.js 22.5 or newer.
 - A symbol-resource-aware consumer app.
+
+The package is both a normal Signal K server plugin and a Signal K WebApp. Its
+`package.json` must include both `signalk-node-server-plugin` and
+`signalk-webapp` keywords. Signal K Server serves the compiled UI from
+`public/` at:
+
+```text
+/signalk-symbol-manager/
+```
+
+Plugin API and symbol asset routes live under:
+
+```text
+/plugins/signalk-symbol-manager/...
+```
 
 For Freeboard-SK, symbol resources will require the forthcoming Freeboard-SK
 symbol-resource consumer PR to be merged and released. Until that Freeboard-SK
@@ -60,9 +76,9 @@ npm link signalk-symbol-manager
 ```
 
 Restart the Signal K server after installing or linking the package, then enable
-the plugin in the Signal K plugin manager. The manager is a Signal K WebApp and
-appears in the server Webapps menu as `Symbol Manager` after the plugin is
-enabled. You can also open it directly:
+the plugin in the Signal K plugin manager. The manager is a Signal K Plugin
+WebApp and appears in the server Webapps menu as `Symbol Manager` after the
+plugin is enabled. You can also open it directly:
 
 ```text
 http://localhost:3000/signalk-symbol-manager/

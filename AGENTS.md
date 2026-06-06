@@ -9,10 +9,16 @@ Before changing or debugging this repository, read:
 This project currently contains implementation-spec documents only. Do not add
 implementation code until the user explicitly starts the implementation phase.
 
-The plugin must remain a normal Signal K server plugin and web app. It should
-not require a custom Signal K server build for end users. The Resource Provider
-API already supports custom resource types, and this plugin should register as
-a provider for `symbols`.
+The plugin must remain a normal Signal K server plugin and Signal K Plugin
+WebApp. It should not require a custom Signal K server build for end users. The
+Resource Provider API already supports custom resource types, and this plugin
+should register as a provider for `symbols`.
+
+The manager UI must be packaged as a Signal K WebApp: put the compiled UI in
+`public/`, include the `signalk-webapp` package keyword, and let Signal K Server
+serve it at `/signalk-symbol-manager/`. Do not serve the UI from
+`registerWithRouter()`; use that only for plugin API and asset routes under
+`/plugins/signalk-symbol-manager/...`.
 
 Keep user-created symbol data out of git. Runtime data should live in the
 Signal K plugin data directory, with SQLite used only for user-managed library
