@@ -129,11 +129,18 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     if (restoringRef.current) return
     const fc = fcRef.current
     if (!fc) return
-    const json = JSON.stringify(fc.toJSON())
+    // The anchor is excluded from canvas toJSON, so capture its position too,
+    // making anchor moves undoable.
+    const m = anchorRef.current
+    const entry = JSON.stringify({
+      c: fc.toJSON(),
+      ax: m ? m.left ?? 0 : 0,
+      ay: m ? m.top ?? 0 : 0
+    })
     const h = historyRef.current
-    if (histIdxRef.current >= 0 && h[histIdxRef.current] === json) return
+    if (histIdxRef.current >= 0 && h[histIdxRef.current] === entry) return
     h.length = histIdxRef.current + 1 // drop any forward states
-    h.push(json)
+    h.push(entry)
     const MAX = 60
     if (h.length > MAX) h.splice(0, h.length - MAX)
     histIdxRef.current = h.length - 1
@@ -150,15 +157,19 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     }, 300)
   }
 
-  const restoreFromJson = async (json: string) => {
+  const restoreFromJson = async (entryStr: string) => {
     const fc = fcRef.current
     if (!fc) return
+    const entry = JSON.parse(entryStr) as { c: object; ax: number; ay: number }
     restoringRef.current = true
     const anchor = anchorRef.current
     try {
-      await fc.loadFromJSON(json)
-      // loadFromJSON clears the canvas (anchor too); re-add the preserved anchor.
+      await fc.loadFromJSON(entry.c)
+      // loadFromJSON clears the canvas (anchor too); re-add the preserved anchor
+      // at its recorded position.
       if (anchor) {
+        anchor.set({ left: entry.ax, top: entry.ay })
+        anchor.setCoords()
         fc.add(anchor)
         fc.bringObjectToFront(anchor)
       }
@@ -172,6 +183,13 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       restoringRef.current = false
     }
     setSelected(null)
+    // Sync the Anchor X/Y fields to the restored position. The marker is already
+    // there, so the anchor-sync effect won't move it (and won't re-record).
+    setMeta((prev) => ({
+      ...prev,
+      anchorX: String(round(entry.ax)),
+      anchorY: String(round(entry.ay))
+    }))
     refreshPreview()
   }
 
@@ -264,13 +282,13 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     fc.on('selection:updated', onSelect)
     fc.on('selection:cleared', () => setSelected(null))
     fc.on('object:moving', onMoving)
-    fc.on('object:modified', (e: { target?: fabric.FabricObject }) => {
+    fc.on('object:modified', () => {
       const a = fc.getActiveObject()
       if (a && !isAnchor(a)) setSelected(snapshot(a))
       refreshPreview()
-      // Record handle-driven transforms (drag/scale/rotate); anchor moves are
-      // not part of symbol history.
-      if (!(e.target && isAnchor(e.target))) recordHistory()
+      // Record handle-driven transforms (drag/scale/rotate). The anchor's
+      // position is part of each snapshot, so dragging it is recorded here too.
+      recordHistory()
     })
     fc.on('mouse:down', onDown)
     fc.on('mouse:up', onUp)
@@ -329,6 +347,9 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       marker.set({ left: ax, top: ay })
       marker.setCoords()
       fc.requestRenderAll()
+      // The marker moved because the X/Y fields were edited (a drag would have
+      // already matched). Record it (debounced); a no-op during restore.
+      scheduleRecord()
     }
   }, [meta.anchorX, meta.anchorY, ready])
 
@@ -460,13 +481,16 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       }
       const group = fabric.util.groupSVGElements(objs, parsed.options)
       const { W, H } = dims.current
-      // Scale the import to about half the symbol and centre it.
-      const target = Math.min(W, H) * 0.5
-      const gw = group.getScaledWidth() || target
-      const f = target / gw
-      group.scale((group.scaleX ?? 1) * f)
-      group.set({ left: W / 2, top: H / 2, originX: 'center', originY: 'center' })
-      group.setCoords()
+      // For a POI, fit the import into the note's body box (per the spec).
+      // Otherwise scale to about half the symbol and centre it.
+      if (!placeInPoiBody(group)) {
+        const target = Math.min(W, H) * 0.5
+        const gw = group.getScaledWidth() || target
+        const f = target / gw
+        group.scale((group.scaleX ?? 1) * f)
+        group.set({ left: W / 2, top: H / 2, originX: 'center', originY: 'center' })
+        group.setCoords()
+      }
       fc.add(group)
       if (anchorRef.current) fc.bringObjectToFront(anchorRef.current)
       fc.setActiveObject(group)
@@ -479,13 +503,12 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     }
   }
 
-  // Scale & position the selected object into the POI body box (from the
-  // template, in viewBox units → converted to source pixels).
-  const fitPoi = () => {
-    const fc = fcRef.current
-    const o = fc?.getActiveObject()
+  // Scale & centre an object inside the POI body box (from the template, in
+  // viewBox units → converted to source pixels), preserving aspect ratio.
+  // Returns false when there is no body box (i.e. not a POI template).
+  const placeInPoiBody = (o: fabric.FabricObject): boolean => {
     const box = draft.bodyBox
-    if (!fc || !o || !box) return
+    if (!box) return false
     const { W, vbW, H, vbH } = dims.current
     const sx = W / vbW
     const sy = H / vbH
@@ -495,8 +518,8 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     const y2 = box.y2 * sy
     const bw = Math.abs(x2 - x1)
     const bh = Math.abs(y2 - y1)
-    const ow = (o.width ?? 1) * 1
-    const oh = (o.height ?? 1) * 1
+    const ow = o.width || 1
+    const oh = o.height || 1
     const f = Math.min(bw / ow, bh / oh)
     o.set({
       scaleX: f,
@@ -507,6 +530,14 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       top: (y1 + y2) / 2
     })
     o.setCoords()
+    return true
+  }
+
+  // "Fit into POI body" button: re-apply the body-box fit to the selection.
+  const fitPoi = () => {
+    const fc = fcRef.current
+    const o = fc?.getActiveObject()
+    if (!fc || !o || !placeInPoiBody(o)) return
     fc.requestRenderAll()
     setSelected(snapshot(o))
     refreshPreview()
@@ -675,7 +706,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
               <h3>Shape</h3>
               <ShapeProperties
                 shape={selected}
-                canFitPoi={!!draft.bodyBox && selected.type === 'group'}
+                canFitPoi={!!draft.bodyBox}
                 onChange={applyShape}
                 onDelete={deleteSelected}
                 onFitPoi={fitPoi}
