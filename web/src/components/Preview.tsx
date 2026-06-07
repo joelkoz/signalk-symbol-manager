@@ -59,7 +59,7 @@ export function Preview({
         </div>
         {onScaleChange ? (
           <label className="zoom">
-            Scale {effScale}
+            Scale {effScale.toFixed(2)}
             <input
               type="range"
               min={SCALE_MIN}

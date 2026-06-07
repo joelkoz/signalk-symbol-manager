@@ -73,7 +73,7 @@ export function MetadataFields({ meta, onChange, config, idLocked }: Props) {
               />
               {role}
               {config.mapMarkerRoles.includes(role) ? (
-                <span className="badge">map</span>
+                <span className="badge">chart</span>
               ) : null}
             </label>
           ))}

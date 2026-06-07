@@ -134,7 +134,7 @@ export function ShapeProperties({
         <input
           type="number"
           min={0}
-          step={0.5}
+          step={0.05}
           value={shape.strokeWidth}
           onChange={(e) => onChange({ strokeWidth: Number(e.target.value) })}
         />
