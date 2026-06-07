@@ -421,6 +421,7 @@ legend {
   text-align: center;
 }
 .canvas-frame {
+  position: relative; /* required for scrollbar overlays */
   width: 460px;
   max-width: 100%;
   height: 380px;
@@ -433,6 +434,49 @@ legend {
     linear-gradient(-45deg, transparent 75%, #e9edf1 75%);
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* Pan scrollbars — appear only when zoomed past the canvas edges */
+.scroll-bar {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.07);
+  border-radius: 4px;
+  z-index: 10;
+  pointer-events: none; /* track itself is not clickable */
+}
+.scroll-bar-x {
+  bottom: 3px;
+  left: 3px;
+  right: 3px;
+  height: 8px;
+}
+.scroll-bar-y {
+  right: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: 8px;
+}
+.scroll-thumb {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 4px;
+  cursor: grab;
+  pointer-events: all; /* thumb captures mouse */
+  transition: background 0.12s;
+  min-width: 16px;
+  min-height: 16px;
+}
+.scroll-thumb:hover,
+.scroll-thumb:active {
+  background: rgba(0, 0, 0, 0.45);
+}
+.scroll-bar-x .scroll-thumb {
+  top: 0;
+  bottom: 0;
+}
+.scroll-bar-y .scroll-thumb {
+  left: 0;
+  right: 0;
 }
 .editor-hint {
   font-size: 12px;

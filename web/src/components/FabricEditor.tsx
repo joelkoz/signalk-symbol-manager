@@ -72,6 +72,10 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   const restoringRef = useRef(false)
   const recordTimerRef = useRef<number | null>(null)
   const drawRef = useRef<DrawState | null>(null)
+  const panRef = useRef({ active: false, startX: 0, startY: 0, startVpt: [1, 0, 0, 1, 0, 0] as number[] })
+  // syncScroll is defined after applyView; this ref lets applyView and event
+  // handlers (captured at mount time) always call the latest version.
+  const syncScrollRef = useRef<() => void>(() => {})
 
   const [meta, setMeta] = useState<SymbolMeta>(draftToMeta(draft))
   const [selected, setSelected] = useState<ShapeSnapshot | null>(null)
@@ -84,6 +88,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [canUndo, setCanUndo] = useState(false)
   const [drawing, setDrawing] = useState(false)
+  const [scroll, setScroll] = useState({ x: 0, y: 0, tw: 1, th: 1, showX: false, showY: false })
 
   const metaRef = useRef(meta)
   metaRef.current = meta
@@ -111,6 +116,67 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     vpt[5] = (VIEW_H - dims.current.H * z) / 2
     fc.setViewportTransform(vpt)
     fc.requestRenderAll()
+    syncScrollRef.current()
+  }
+
+  // Recompute scrollbar visibility / thumb positions from Fabric's actual
+  // viewportTransform. Uses fc.getZoom() so it is safe to call from stale
+  // closures inside useEffect([]) handlers.
+  const syncScroll = () => {
+    const fc = fcRef.current
+    if (!fc) return
+    const tz = fc.getZoom()
+    const cw = dims.current.W * tz
+    const ch = dims.current.H * tz
+    const vpt = fc.viewportTransform
+    const showX = cw > VIEW_W + 1
+    const showY = ch > VIEW_H + 1
+    const sx = showX ? Math.max(0, Math.min(1, -vpt[4] / (cw - VIEW_W))) : 0
+    const sy = showY ? Math.max(0, Math.min(1, -vpt[5] / (ch - VIEW_H))) : 0
+    const tw = showX ? Math.max(0.08, VIEW_W / cw) : 1
+    const th = showY ? Math.max(0.08, VIEW_H / ch) : 1
+    setScroll({ x: sx, y: sy, tw, th, showX, showY })
+  }
+  // Always keep the ref pointing at the latest closure.
+  syncScrollRef.current = syncScroll
+
+  // Begin a scrollbar-thumb drag. Called from onMouseDown on the thumb divs.
+  const startScrollDrag = (axis: 'x' | 'y', e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const fc = fcRef.current
+    if (!fc) return
+    const startPos = axis === 'x' ? e.clientX : e.clientY
+    const startVpt = [...fc.viewportTransform]
+    const tz = fc.getZoom()
+    const cw = dims.current.W * tz
+    const ch = dims.current.H * tz
+    // Capture thumb fraction at drag start so it stays stable for the whole drag.
+    const thumbFrac = axis === 'x' ? Math.max(0.08, VIEW_W / cw) : Math.max(0.08, VIEW_H / ch)
+    const onMove = (me: MouseEvent) => {
+      const delta = (axis === 'x' ? me.clientX : me.clientY) - startPos
+      const vpt = [...startVpt] as typeof fc.viewportTransform
+      if (axis === 'x' && cw > VIEW_W) {
+        const maxScroll = cw - VIEW_W
+        const scrollable = VIEW_W * (1 - thumbFrac)
+        const scrollDelta = scrollable > 0 ? (delta / scrollable) * maxScroll : 0
+        vpt[4] = Math.max(VIEW_W - cw, Math.min(0, startVpt[4] - scrollDelta))
+      } else if (axis === 'y' && ch > VIEW_H) {
+        const maxScroll = ch - VIEW_H
+        const scrollable = VIEW_H * (1 - thumbFrac)
+        const scrollDelta = scrollable > 0 ? (delta / scrollable) * maxScroll : 0
+        vpt[5] = Math.max(VIEW_H - ch, Math.min(0, startVpt[5] - scrollDelta))
+      }
+      fc.setViewportTransform(vpt)
+      fc.requestRenderAll()
+      syncScrollRef.current()
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
   }
 
   // Generate the current symbol SVG (without the anchor overlay).
@@ -386,6 +452,8 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     const baseFindTarget = fc.findTarget.bind(fc)
     type FT = typeof baseFindTarget
     const stickyFindTarget: FT = (e) => {
+      // Pan mode (Shift held): don't pick any object so Fabric won't try to drag it.
+      if ((e as MouseEvent).shiftKey) return undefined as ReturnType<FT>
       const active = fc.getActiveObject()
       if (
         active &&
@@ -435,6 +503,16 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     }
     type PtArg = Parameters<typeof fc.getScenePoint>[0]
     const onDown = (opt: { e: Event }) => {
+      const me = opt.e as MouseEvent
+      if (me.shiftKey && !drawRef.current) {
+        panRef.current.active = true
+        panRef.current.startX = me.clientX
+        panRef.current.startY = me.clientY
+        panRef.current.startVpt = [...fc.viewportTransform]
+        fc.selection = false
+        fc.defaultCursor = 'grabbing'
+        return
+      }
       const p = fc.getScenePoint(opt.e as PtArg)
       if (drawRef.current) {
         handleDrawClick({ x: p.x, y: p.y })
@@ -443,6 +521,25 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       down.current = { x: p.x, y: p.y }
     }
     const onMove = (opt: { e: Event }) => {
+      const me = opt.e as MouseEvent
+      if (panRef.current.active) {
+        const dx = me.clientX - panRef.current.startX
+        const dy = me.clientY - panRef.current.startY
+        const vpt = [...panRef.current.startVpt] as typeof fc.viewportTransform
+        const tz = fc.getZoom()
+        const cw = dims.current.W * tz
+        const ch = dims.current.H * tz
+        vpt[4] = cw > VIEW_W
+          ? Math.max(VIEW_W - cw, Math.min(0, panRef.current.startVpt[4] + dx))
+          : panRef.current.startVpt[4]
+        vpt[5] = ch > VIEW_H
+          ? Math.max(VIEW_H - ch, Math.min(0, panRef.current.startVpt[5] + dy))
+          : panRef.current.startVpt[5]
+        fc.setViewportTransform(vpt)
+        fc.requestRenderAll()
+        syncScrollRef.current()
+        return
+      }
       if (!drawRef.current) return
       const p = fc.getScenePoint(opt.e as PtArg)
       moveRubber({ x: p.x, y: p.y })
@@ -450,7 +547,40 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     const onDblClick = () => {
       if (drawRef.current) finishPolygon(false)
     }
+    // Wheel / trackpad scroll pans the view (rather than zooming). Two-finger
+    // trackpad gestures supply deltaX/deltaY directly; a plain mouse wheel pans
+    // vertically, and Shift+wheel pans horizontally. Only consumes the event
+    // when there is something to pan, so the page can still scroll otherwise.
+    const onWheel = (opt: { e: Event }) => {
+      const e = opt.e as WheelEvent
+      const tz = fc.getZoom()
+      const cw = dims.current.W * tz
+      const ch = dims.current.H * tz
+      const canX = cw > VIEW_W + 1
+      const canY = ch > VIEW_H + 1
+      if (!canX && !canY) return
+      let dx = e.deltaX
+      let dy = e.deltaY
+      if (e.shiftKey && dx === 0) {
+        dx = dy
+        dy = 0
+      }
+      e.preventDefault()
+      e.stopPropagation()
+      const vpt = fc.viewportTransform.slice() as typeof fc.viewportTransform
+      if (canX) vpt[4] = Math.max(VIEW_W - cw, Math.min(0, vpt[4] - dx))
+      if (canY) vpt[5] = Math.max(VIEW_H - ch, Math.min(0, vpt[5] - dy))
+      fc.setViewportTransform(vpt)
+      fc.requestRenderAll()
+      syncScrollRef.current()
+    }
     const onUp = (opt: { e: Event }) => {
+      if (panRef.current.active) {
+        panRef.current.active = false
+        fc.selection = true
+        fc.defaultCursor = (opt.e as MouseEvent).shiftKey ? 'grab' : 'default'
+        return
+      }
       if (drawRef.current) return
       const p = fc.getScenePoint(opt.e as PtArg)
       const d = down.current
@@ -488,6 +618,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     })
     fc.on('mouse:down', onDown)
     fc.on('mouse:move', onMove)
+    fc.on('mouse:wheel', onWheel)
     fc.on('mouse:dblclick', onDblClick)
     fc.on('mouse:up', onUp)
     ;(async () => {
@@ -555,10 +686,25 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   // in a form field or editing text on the canvas (Fabric uses a hidden
   // textarea while editing IText, which the tag check below catches).
   useEffect(() => {
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        const fc = fcRef.current
+        if (fc && !panRef.current.active) {
+          fc.defaultCursor = drawRef.current ? 'crosshair' : 'default'
+        }
+      }
+    }
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       const tag = t?.tagName
       const inField = tag === 'INPUT' || tag === 'TEXTAREA' || !!t?.isContentEditable
+      // Shift held: hint the grab cursor over the canvas.
+      if (e.key === 'Shift') {
+        const fc = fcRef.current
+        if (fc && !panRef.current.active && !drawRef.current) {
+          fc.defaultCursor = 'grab'
+        }
+      }
       // Esc cancels an in-progress polygon.
       if (e.key === 'Escape' && drawRef.current) {
         e.preventDefault()
@@ -582,7 +728,11 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       deleteSelectedRef.current()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [])
 
   // --- toolbar actions ----------------------------------------------------
@@ -810,6 +960,14 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
 
   const previewDims = useMemo(() => svgSize(previewSvg), [previewSvg])
 
+  // Zoom slider works in displayed-percentage units: min = the fit zoom (the
+  // whole symbol visible), max = 3000%, stepping 50 percentage points. The
+  // internal `zoom` state is a multiplier on top of fitZoom(), so convert.
+  const fz = fitZoom()
+  const zoomMaxPct = 3000
+  const zoomMinPct = Math.round(fz * 100)
+  const zoomCurPct = Math.round(fz * zoom * 100)
+
   return (
     <div className="editor">
       <input
@@ -874,17 +1032,41 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
               Zoom
               <input
                 type="range"
-                min={1}
-                max={12}
-                step={0.5}
-                value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
+                min={zoomMinPct}
+                max={zoomMaxPct}
+                step={50}
+                value={Math.min(zoomMaxPct, Math.max(zoomMinPct, zoomCurPct))}
+                onChange={(e) => setZoom(Number(e.target.value) / 100 / fz)}
               />
-              <span className="zoom-label">{Math.round(fitZoom() * zoom * 100)}%</span>
+              <span className="zoom-label">{zoomCurPct}%</span>
             </label>
           </div>
           <div className="canvas-frame">
             <canvas ref={canvasElRef} width={VIEW_W} height={VIEW_H} />
+            {scroll.showX && (
+              <div className="scroll-bar scroll-bar-x">
+                <div
+                  className="scroll-thumb"
+                  style={{
+                    width: `${scroll.tw * 100}%`,
+                    left: `${scroll.x * (1 - scroll.tw) * 100}%`
+                  }}
+                  onMouseDown={(e) => startScrollDrag('x', e)}
+                />
+              </div>
+            )}
+            {scroll.showY && (
+              <div className="scroll-bar scroll-bar-y">
+                <div
+                  className="scroll-thumb"
+                  style={{
+                    height: `${scroll.th * 100}%`,
+                    top: `${scroll.y * (1 - scroll.th) * 100}%`
+                  }}
+                  onMouseDown={(e) => startScrollDrag('y', e)}
+                />
+              </div>
+            )}
           </div>
           <div className="editor-hint">
             {drawing ? (
@@ -895,7 +1077,8 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
             ) : (
               <>
                 Click a shape to select; click again to cycle through overlapping
-                shapes. Drag the blue ⊕ to set the anchor point.
+                shapes. Drag the blue ⊕ to set the anchor point.{' '}
+                <strong>Shift+drag</strong> to pan when zoomed in.
               </>
             )}
           </div>
