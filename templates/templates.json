@@ -1,5 +1,5 @@
 {
-  "$comment": "Extensible starter-template catalog for the Symbol Manager. Add a new entry with an svgFile under templates/svg/ and its default metadata to offer a new starter. Templates whose roles include note/waypoint/map-marker must define scale and anchor. The optional editor.bodyBox (in viewBox units) marks the POI body area for Phase-2 import-shape placement; editor.fillTarget is a CSS selector the editor's fill picker recolors.",
+  "$comment": "Extensible starter-template catalog for the Symbol Manager. Add a new entry with an svgFile under templates/svg/ and its default metadata to offer a new starter. Templates whose roles include note/waypoint/map-marker must define scale and anchor. The optional editor.bodyBox (in viewBox units) marks the area where SVG imports into the editor are sized and placed in; editor.fillTarget is a CSS selector the editor's fill picker recolors.",
   "templates": [
     {
       "key": "poi",
