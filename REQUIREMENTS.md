@@ -34,6 +34,25 @@ repositories. Do not create branches, edit files, or commit changes in
 
 The plugin UI will use React + Fabric.js. Keep upload/source editing as fallback for complex SVGs. 
 
+## General requirements
+Node.js 22.5+ is required because the plugin uses Node's integrated
+`node:sqlite` support for user-managed symbol metadata.
+
+The package is both a normal Signal K server plugin and a Signal K WebApp. Its
+`package.json` must include both `signalk-node-server-plugin` and
+`signalk-webapp` keywords. Signal K Server serves the compiled UI from
+`public/` at:
+
+```text
+/signalk-symbol-manager/
+```
+
+Plugin API and symbol asset routes live under:
+
+```text
+/plugins/signalk-symbol-manager/...
+```
+
 ## Additional References
 
 - [Fabric.js](https://github.com/fabricjs/fabric.js/)

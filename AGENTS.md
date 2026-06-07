@@ -6,9 +6,6 @@ Before changing or debugging this repository, read:
 2. `REQUIREMENTS.md`
 3. `MEMORY.md`, if present
 
-This project currently contains implementation-spec documents only. Do not add
-implementation code until the user explicitly starts the implementation phase.
-
 Symbol Manager implementation work is standalone. Use a
 `symbol-resource-provider` branch in this repository only. Do not create
 branches, edit files, or commit changes in `../signalk-server-node` or

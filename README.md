@@ -19,39 +19,17 @@ plugin API routes under `/plugins/signalk-symbol-manager/...`.
 
 This plugin requires:
 
-- Signal K Server with Resource Provider plugin support.
 - Node.js 22.5 or newer.
-- A symbol-resource-aware consumer app.
+- A "symbol resource aware" consumer app.
 
-Node.js 22.5+ is required because the plugin uses Node's integrated
-`node:sqlite` support for user-managed symbol metadata.
-
-The package is both a normal Signal K server plugin and a Signal K WebApp. Its
-`package.json` must include both `signalk-node-server-plugin` and
-`signalk-webapp` keywords. Signal K Server serves the compiled UI from
-`public/` at:
-
-```text
-/signalk-symbol-manager/
-```
-
-Plugin API and symbol asset routes live under:
-
-```text
-/plugins/signalk-symbol-manager/...
-```
-
-For Freeboard-SK, symbol resources will require the forthcoming Freeboard-SK
-symbol-resource consumer PR to be merged and released. Until that Freeboard-SK
+### Symbol Aware Apps
+Freeboard-SK is the reference application that consumes symbols created in this library. A forthcoming Freeboard-SK
+symbol-resource consumer PR will soon be merged and released. Until that Freeboard-SK
 PR is available in your installed Freeboard version, the symbols can be managed
 by this plugin but will not appear in Freeboard's icon selectors or map markers.
 
-A Signal K server upgrade is not expected solely to install this plugin on
-servers that already include Resource Provider support. The Signal K resources
-API supports custom/user-defined resource provider types, and `symbols` can be
-registered through that existing mechanism.
 
-## Planned Features
+## Features
 
 - Create custom SVG symbols.
 - Edit symbols in an integrated lightweight Fabric.js editor.
