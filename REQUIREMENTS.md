@@ -43,9 +43,18 @@ Signal K server): the `symbols` resource provider, the plugin manager API,
 SQLite storage, SVG sanitization and asset serving, the four starter templates,
 and the React list-manager UI (new-from-template, metadata editing with
 roles/tags/scale/anchor, fill-color, direct upload, duplicate, delete, and a
-Freeboard-accurate preview). Phase 2 (pending): the full Fabric.js visual editor
-(shape add/select with z-order cycling, draggable anchor overlay, import-shape
-into the POI body box, raw-SVG round-trip, zoom, scale-whole-symbol).
+Freeboard-accurate preview). Phase 2 (implemented): the Fabric.js visual editor
+for New/Edit (`FabricEditor`) — shape add/select with z-order click-cycling,
+draggable editor-only anchor overlay, contextual shape properties
+(X/Y/W/H, fill/outline), import-shape with POI body-box placement, raw-SVG
+view/edit, zoom/fit, and export→sanitize→save. Direct upload still uses the
+simpler metadata-only form, bypassing the editor as specified.
+
+> Note: the web app is intentionally not wrapped in `<React.StrictMode>` because
+> StrictMode's development double-invocation mounts and disposes the Fabric.js
+> canvas twice, corrupting the imperatively-managed editor (production React does
+> not double-invoke). The Freeboard preview defaults to 1× magnification and does
+> not draw the anchor marker (the draggable anchor lives on the editor canvas).
 
 **Deviations from the original spec, with rationale:**
 

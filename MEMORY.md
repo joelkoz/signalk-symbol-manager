@@ -9,11 +9,25 @@ Working notes for agents. Read alongside `README.md` and `REQUIREMENTS.md`.
   public asset serving, the 4 templates, and the React list-manager UI
   (new-from-template, metadata edit, upload, duplicate, delete,
   Freeboard-size preview) are implemented and working.
-- **Phase 2 (rich Fabric.js visual editor) — NOT STARTED.** Still to build:
-  shape add/select with z-order click-cycling, draggable anchor-point overlay,
-  import-shape with POI body-box placement, raw-SVG round-trip, zoom, and
-  scale-whole-symbol. `fabric` is already a dependency. Template metadata
-  already carries `editor.fillTarget` and POI `editor.bodyBox` for this work.
+- **Phase 2 (rich Fabric.js visual editor) — IMPLEMENTED.** `FabricEditor.tsx`
+  (used for New/Edit; upload still uses the simpler `SymbolForm`). Provides:
+  canvas SVG load, draggable anchor-point overlay (editor-only,
+  `excludeFromExport`), shape tools (rect/circle/line/arrow/text), contextual
+  shape properties (X/Y/W/H, fill/outline/outline-width, reorder, delete,
+  POI body-fit), z-order click-cycling (on click-without-drag), import-shape
+  (sanitized → grouped), zoom/fit, raw-SVG view/edit, and export→sanitize→save.
+  Shared metadata moved to `MetadataFields.tsx`.
+  - **Gotcha:** the app is NOT wrapped in `<React.StrictMode>` (see `main.tsx`).
+    StrictMode's dev double-invoke mounts/disposes the Fabric canvas twice and
+    corrupts it (edits silently dropped on export). Production React never
+    double-invokes, so this was dev-only, but StrictMode is removed so dev==prod.
+  - W/H edits scale by desired/current *scaled* size (stroke-inclusive), not
+    `W/width`, so they're exact.
+  - Verified in-browser: SVG load, anchor render, add-shape, contextual props,
+    exact W/H edit, anchor-field sync, live 1× preview (no anchor marker), and
+    the full save round-trip (persisted SVG contains editor-added shapes).
+    Lighter-verified (implemented, not click-simulated): canvas click-to-select,
+    z-cycle, anchor drag, import-shape, color edits.
 
 ## Key decisions
 

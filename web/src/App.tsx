@@ -9,11 +9,13 @@ import { nominalSize } from './svg'
 import { SymbolList } from './components/SymbolList'
 import { TemplatePicker } from './components/TemplatePicker'
 import { SymbolForm } from './components/SymbolForm'
+import { FabricEditor } from './components/FabricEditor'
 
 type View =
   | { kind: 'list' }
   | { kind: 'pick-template' }
-  | { kind: 'form'; draft: SymbolDraft }
+  | { kind: 'editor'; draft: SymbolDraft } // visual Fabric editor (New / Edit)
+  | { kind: 'form'; draft: SymbolDraft } // metadata-only form (Upload)
 
 export function App() {
   const [config, setConfig] = useState<AppConfig | null>(null)
@@ -63,9 +65,10 @@ export function App() {
       svg: t.svg,
       width: n?.width ?? null,
       height: n?.height ?? null,
-      fillTarget: t.editor.fillTarget
+      fillTarget: t.editor.fillTarget,
+      bodyBox: t.editor.bodyBox
     }
-    setView({ kind: 'form', draft })
+    setView({ kind: 'editor', draft })
   }
 
   // --- Upload -------------------------------------------------------------
@@ -123,7 +126,7 @@ export function App() {
         width: s.width,
         height: s.height
       }
-      setView({ kind: 'form', draft })
+      setView({ kind: 'editor', draft })
     } catch (e) {
       setError((e as Error).message)
     }
@@ -195,6 +198,15 @@ export function App() {
 
       {view.kind === 'pick-template' ? (
         <TemplatePicker onPick={pickTemplate} onCancel={() => setView({ kind: 'list' })} />
+      ) : null}
+
+      {view.kind === 'editor' && config ? (
+        <FabricEditor
+          draft={view.draft}
+          config={config}
+          onSaved={onSaved}
+          onCancel={() => setView({ kind: 'list' })}
+        />
       ) : null}
 
       {view.kind === 'form' && config ? (

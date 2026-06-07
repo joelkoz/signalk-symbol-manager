@@ -250,10 +250,12 @@ button.link {
 }
 .editor-body {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  /* Canvas/editor column grows with the window; properties stay a fixed width. */
+  grid-template-columns: minmax(480px, 1fr) 340px;
   gap: 24px;
+  align-items: start;
 }
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .editor-body {
     grid-template-columns: 1fr;
   }
@@ -339,16 +341,15 @@ legend {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 180px;
+  min-height: 200px;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background-image: linear-gradient(45deg, #e9edf1 25%, transparent 25%),
-    linear-gradient(-45deg, #e9edf1 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #e9edf1 75%),
-    linear-gradient(-45deg, transparent 75%, #e9edf1 75%);
-  background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  overflow: hidden;
+  /* Sample nautical-chart background (set inline by the Preview component). */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .preview-frame {
   position: relative;
@@ -384,6 +385,169 @@ legend {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
+}
+
+/* --- fabric editor --- */
+.editor-canvas-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tool-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tool-bar button {
+  min-width: 34px;
+  padding: 5px 8px;
+}
+.tool-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.zoom-label {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 42px;
+  text-align: center;
+}
+.canvas-frame {
+  width: 460px;
+  max-width: 100%;
+  height: 380px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-image: linear-gradient(45deg, #e9edf1 25%, transparent 25%),
+    linear-gradient(-45deg, #e9edf1 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e9edf1 75%),
+    linear-gradient(-45deg, transparent 75%, #e9edf1 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.editor-hint {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 460px;
+}
+.zoom-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.zoom-slider input[type='range'] {
+  width: 110px;
+}
+
+/* Instant, styled tooltips for editor controls (the native `title` tooltip is
+   slow and easy to miss, especially on the icon buttons). Uses aria-label so
+   it also serves screen readers. */
+.tip {
+  position: relative;
+}
+.tip[aria-label]:hover::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 220px;
+  white-space: normal;
+  text-align: center;
+  background: #1d2733;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  padding: 5px 8px;
+  border-radius: 6px;
+  z-index: 30;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.tip[aria-label]:hover::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: #1d2733;
+  z-index: 30;
+  pointer-events: none;
+}
+
+/* contextual shape properties */
+.shape-props {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.shape-type {
+  font-weight: 600;
+}
+.shape-props label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+.shape-props input {
+  width: 100%;
+  margin-top: 3px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+.xywh {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 6px;
+}
+.color-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.color-field {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.color-field input[type='color'] {
+  width: 44px;
+  height: 28px;
+  padding: 0;
+}
+.shape-actions {
+  display: flex;
+  gap: 6px;
+}
+.mini-preview {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.metadata-fields label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.metadata-fields input:not([type='checkbox']) {
+  width: 100%;
+  margin-top: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
 }
 
 /* --- tag input (react-tag-input-component) --- */
