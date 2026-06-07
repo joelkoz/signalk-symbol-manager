@@ -2,14 +2,76 @@
 
 Before changing or debugging this repository, read:
 
-1. `README.md`
-2. `REQUIREMENTS.md`
-3. `MEMORY.md`, if present
+1. `README.md` — end-user documentation. Read it to understand the user-facing
+   feature set, terminology, and the namespace-override mechanism. **Do not**
+   add developer-only material (build commands, HTTP routes, sanitizer
+   internals, etc.) to this file — that content lives here and in
+   `REQUIREMENTS.md`.
+2. `REQUIREMENTS.md` — the authoritative implementation spec: HTTP routes,
+   resource shape, namespace rules, SVG sanitization, data storage layout,
+   verification and test plan.
+3. `MEMORY.md`, if present.
 
 Symbol Manager implementation work is standalone. Use a
 `symbol-resource-provider` branch in this repository only. Do not create
 branches, edit files, or commit changes in `../signalk-server-node` or
 `../freeboard-sk` while working on this plugin.
+
+## Repository layout
+
+```
+src/        TypeScript backend source (plugin entry, store, service, routes,
+            sanitizer, types). Compiled to plugin/ via the build script.
+plugin/     Compiled JavaScript that signalk-server actually runs.
+            Generated — do not hand-edit.
+web/        Vite + React + Fabric.js editor source. Compiled to public/.
+public/     The Signal K WebApp bundle that the server serves at
+            /signalk-symbol-manager/. Generated — do not hand-edit.
+templates/  Starter-template catalog (templates.json + svg/*.svg).
+            Loaded by the backend at request time; no rebuild required.
+test/       Node test runner suites for the backend (sanitizer, key
+            validation, service round-trips, store).
+```
+
+## Build / test / run
+
+```sh
+npm install            # install all deps (backend + web)
+npm run build          # tsc backend → plugin/, vite build web → public/
+npm run build:web      # web only (vite build)
+npm test               # backend unit tests (node --test)
+```
+
+For interactive editor work, run the Vite dev server (with proxy to a local
+Signal K server on :3000):
+
+```sh
+npm run dev -- --port 5180 --strictPort
+```
+
+The web app uses the Signal K admin cookie for `/plugins/...` and
+`/signalk/...` calls, so the dev page must be loaded after logging in to
+`http://localhost:3000/admin/`.
+
+**Do not wrap the web app in `<React.StrictMode>`.** StrictMode's
+development double-invocation mounts and disposes the Fabric.js canvas
+twice, corrupting the imperatively-managed editor. The omission is
+deliberate and is noted in `REQUIREMENTS.md`.
+
+## Local Signal K dev server
+
+This workspace runs Signal K via `signalk-server-node/bin/n2k-from-file`,
+which has a long-standing memory leak unrelated to this plugin and will OOM
+after ~10–15 minutes on the default Node heap. Launch it with a larger heap
+when investigating issues that need uptime:
+
+```sh
+PORT=3000 NODE_OPTIONS="--max-old-space-size=8192" \
+  signalk-server-node/bin/n2k-from-file
+```
+
+This is an environment workaround. **Do not** edit `signalk-server-node` to
+work around it — the workspace rule forbids changes outside this plugin.
 
 The plugin must remain a normal Signal K server plugin and Signal K Plugin
 WebApp. It should not require a custom Signal K server build for end users. The
