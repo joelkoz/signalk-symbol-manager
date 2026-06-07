@@ -547,13 +547,15 @@ legend {
   font-size: 13px;
   color: var(--muted);
 }
-.shape-props input {
+.shape-props input,
+.shape-props select {
   width: 100%;
   margin-top: 3px;
   padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font: inherit;
+  background: var(--panel);
 }
 .xywh {
   display: grid;
@@ -579,7 +581,11 @@ legend {
   display: flex;
   gap: 6px;
 }
-.mini-preview {
+/* Editor right column: Preview on top, properties beneath, separated by a
+   subtle divider. In single-column responsive mode the right column drops
+   below the canvas column, so this puts the Preview directly under the main
+   editor — matching the rule in the wide layout. */
+.props-block {
   margin-top: 16px;
   border-top: 1px solid var(--border);
   padding-top: 12px;

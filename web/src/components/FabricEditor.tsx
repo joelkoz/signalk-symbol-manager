@@ -775,6 +775,9 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     if ('opacity' in patch && patch.opacity !== undefined) {
       o.set('opacity', patch.opacity)
     }
+    if ('fontFamily' in patch && patch.fontFamily !== undefined) {
+      o.set('fontFamily', patch.fontFamily)
+    }
     o.setCoords()
     fc.requestRenderAll()
     setSelected(snapshot(o))
@@ -815,6 +818,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     if (anchorRef.current) fc.bringObjectToFront(anchorRef.current)
     fc.requestRenderAll()
     refreshPreview()
+    recordHistory()
   }
 
   const onImportClick = () => fileRef.current?.click()
@@ -1105,32 +1109,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
         </div>
 
         <div className="editor-props">
-          {selected ? (
-            <>
-              <h3>Shape</h3>
-              <ShapeProperties
-                shape={selected}
-                canFitPoi={!!draft.bodyBox}
-                onChange={applyShape}
-                onDelete={deleteSelected}
-                onFitPoi={fitPoi}
-                onBringForward={() => reorder('forward')}
-                onSendBackward={() => reorder('backward')}
-              />
-            </>
-          ) : (
-            <>
-              <h3>Symbol properties</h3>
-              <MetadataFields
-                meta={meta}
-                onChange={updateMeta}
-                config={config}
-                idLocked={draft.mode === 'edit'}
-              />
-            </>
-          )}
-
-          <div className="mini-preview">
+          <div className="preview-block">
             <h3>Preview</h3>
             <Preview
               svgText={previewSvg}
@@ -1139,6 +1118,33 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
               scale={meta.scale.trim() === '' ? null : Number(meta.scale)}
               onScaleChange={(s) => updateMeta({ scale: String(s) })}
             />
+          </div>
+
+          <div className="props-block">
+            {selected ? (
+              <>
+                <h3>Shape</h3>
+                <ShapeProperties
+                  shape={selected}
+                  canFitPoi={!!draft.bodyBox}
+                  onChange={applyShape}
+                  onDelete={deleteSelected}
+                  onFitPoi={fitPoi}
+                  onBringForward={() => reorder('forward')}
+                  onSendBackward={() => reorder('backward')}
+                />
+              </>
+            ) : (
+              <>
+                <h3>Symbol properties</h3>
+                <MetadataFields
+                  meta={meta}
+                  onChange={updateMeta}
+                  config={config}
+                  idLocked={draft.mode === 'edit'}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>

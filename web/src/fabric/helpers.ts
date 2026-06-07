@@ -98,6 +98,7 @@ export function makeShape(
       return new fabric.IText('Text', {
         ...common,
         fontSize: Math.max(12, size * 0.5),
+        fontFamily: 'sans-serif',
         fill: '#000000'
       })
   }
@@ -117,7 +118,8 @@ export function snapshot(o: fabric.FabricObject): ShapeSnapshot {
     fill: typeof o.fill === 'string' ? o.fill : '',
     stroke: typeof o.stroke === 'string' ? o.stroke : '',
     strokeWidth: o.strokeWidth ?? 0,
-    opacity: o.opacity ?? 1
+    opacity: o.opacity ?? 1,
+    fontFamily: (o as unknown as { fontFamily?: string }).fontFamily ?? 'sans-serif'
   }
 }
 

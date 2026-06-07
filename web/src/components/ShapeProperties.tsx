@@ -12,7 +12,25 @@ export interface ShapeSnapshot {
   stroke: string
   strokeWidth: number
   opacity: number
+  fontFamily: string
 }
+
+// Common SVG-safe font families. Listed by generic CSS family first so they
+// render predictably on any platform that displays the exported symbol.
+const FONT_FAMILIES: { label: string; value: string }[] = [
+  { label: 'Sans-serif (default)', value: 'sans-serif' },
+  { label: 'Serif', value: 'serif' },
+  { label: 'Monospace', value: 'monospace' },
+  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+  { label: 'Verdana', value: 'Verdana, sans-serif' },
+  { label: 'Tahoma', value: 'Tahoma, sans-serif' },
+  { label: 'Trebuchet MS', value: '"Trebuchet MS", sans-serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Courier New', value: '"Courier New", monospace' },
+  { label: 'Impact', value: 'Impact, sans-serif' }
+]
 
 const TYPE_LABELS: Record<string, string> = {
   rect: 'Rectangle',
@@ -59,13 +77,33 @@ export function ShapeProperties({
       <div className="shape-type">{TYPE_LABELS[shape.type] || shape.type}</div>
 
       {shape.isText ? (
-        <label>
-          Text
-          <input
-            value={shape.text}
-            onChange={(e) => onChange({ text: e.target.value })}
-          />
-        </label>
+        <>
+          <label>
+            Text
+            <input
+              value={shape.text}
+              onChange={(e) => onChange({ text: e.target.value })}
+            />
+          </label>
+          <label>
+            Font
+            <select
+              value={shape.fontFamily}
+              onChange={(e) => onChange({ fontFamily: e.target.value })}
+            >
+              {/* If the shape carries an unknown family (e.g. an imported SVG),
+                  surface it so the user can see what's in use. */}
+              {FONT_FAMILIES.find((f) => f.value === shape.fontFamily) ? null : (
+                <option value={shape.fontFamily}>{shape.fontFamily} (custom)</option>
+              )}
+              {FONT_FAMILIES.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       ) : null}
 
       <div className="xywh">
