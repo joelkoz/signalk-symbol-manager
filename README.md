@@ -112,11 +112,55 @@ The Symbol Manager resource provider keys symbols by the qualified
 it returns a symbol only when exactly one managed symbol has that local id. If
 multiple namespaces contain the same local id, the lookup is ambiguous.
 
+## HTTP Endpoints
+
+Discovery / read (public, subject to the server's read-only access policy):
+
+```text
+GET /signalk/v2/api/resources/symbols            # collection keyed by namespace:id
+GET /signalk/v2/api/resources/symbols/:resourceId # one symbol (namespace:id or unique local id)
+```
+
+Symbol SVG asset (public):
+
+```text
+GET /signalk/symbol-manager/symbols/:ref.svg     # served as image/svg+xml
+```
+
+> **Note on the asset path.** Each resource's `url` points at
+> `/signalk/symbol-manager/symbols/...`, served outside `/plugins`. The Signal K
+> server gates every `/plugins/*` route behind *admin* authentication (it does
+> not honor `allow_readonly` there), so an asset under `/plugins` would not be
+> loadable by read-only consumers. Serving the SVG on a public `/signalk` path —
+> the same approach used by chart-tile plugins — keeps symbols discoverable and
+> renderable for any consumer when the server allows read-only access.
+
+Manager CRUD API (under `/plugins/...`, which the server protects with admin
+authentication; mutations therefore require an authenticated administrator):
+
+```text
+GET    /plugins/signalk-symbol-manager/api/symbols
+GET    /plugins/signalk-symbol-manager/api/symbols/:ref
+POST   /plugins/signalk-symbol-manager/api/symbols
+PUT    /plugins/signalk-symbol-manager/api/symbols/:ref
+POST   /plugins/signalk-symbol-manager/api/symbols/:ref/duplicate
+DELETE /plugins/signalk-symbol-manager/api/symbols/:ref
+GET    /plugins/signalk-symbol-manager/api/templates
+POST   /plugins/signalk-symbol-manager/api/sanitize
+```
+
+`POST` / `PUT` / `DELETE` against `/signalk/v2/api/resources/symbols` are
+rejected without mutating the library: the resource provider is read-only.
+
 ## SVG Safety
 
-Uploaded SVG files will be treated as untrusted user input. The plugin should
-sanitize uploaded SVG before storing or serving it, removing scripts, event
-handlers, unsafe external references, and unsupported embedded content.
+Uploaded SVG files are treated as untrusted user input. The plugin sanitizes SVG
+before storing or serving it using a strict allowlist over a pure-JS DOM
+(`@xmldom/xmldom`, no jsdom): only allowlisted SVG elements are kept, and
+scripts, event-handler attributes, `<foreignObject>`, external references,
+`javascript:`/CSS `expression()`, unsafe `<style>` CSS, and internal entity
+definitions (XXE guard) are removed, with a configurable size limit. Assets are
+served with `Content-Type: image/svg+xml`.
 
 ## Chart Symbols
 

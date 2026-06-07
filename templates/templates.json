@@ -1,0 +1,62 @@
+{
+  "$comment": "Extensible starter-template catalog for the Symbol Manager. Add a new entry with an svgFile under templates/svg/ and its default metadata to offer a new starter. Templates whose roles include note/waypoint/map-marker must define scale and anchor. The optional editor.bodyBox (in viewBox units) marks the POI body area for Phase-2 import-shape placement; editor.fillTarget is a CSS selector the editor's fill picker recolors.",
+  "templates": [
+    {
+      "key": "poi",
+      "name": "POI",
+      "description": "Freeboard-SK style note / point-of-interest marker. Plain colored note marker (no stripe) with an editable fill color.",
+      "svgFile": "svg/poi.svg",
+      "defaults": {
+        "roles": ["note", "waypoint", "map-marker"],
+        "tags": [],
+        "scale": 0.65,
+        "anchor": [1, 37]
+      },
+      "editor": {
+        "fillTarget": "[data-fill=\"body\"]",
+        "bodyBox": { "x1": 2.05, "y1": 1.0, "x2": 7.65, "y2": 6.32 }
+      }
+    },
+    {
+      "key": "flag",
+      "name": "Flag",
+      "description": "Flag-shaped marker on a staff. Anchor sits at the base of the staff.",
+      "svgFile": "svg/flag.svg",
+      "defaults": {
+        "roles": ["map-marker"],
+        "tags": [],
+        "scale": 1,
+        "anchor": [7, 37]
+      },
+      "editor": {
+        "fillTarget": "[data-fill=\"body\"]"
+      }
+    },
+    {
+      "key": "waypoint",
+      "name": "Waypoint",
+      "description": "Map-pin waypoint marker. Anchor sits at the tip of the pin.",
+      "svgFile": "svg/waypoint.svg",
+      "defaults": {
+        "roles": ["waypoint", "map-marker"],
+        "tags": [],
+        "scale": 1,
+        "anchor": [18, 37]
+      },
+      "editor": {
+        "fillTarget": "[data-fill=\"body\"]"
+      }
+    },
+    {
+      "key": "blank",
+      "name": "Blank",
+      "description": "Empty 48x48 canvas to build a symbol from scratch.",
+      "svgFile": "svg/blank.svg",
+      "defaults": {
+        "roles": [],
+        "tags": []
+      },
+      "editor": {}
+    }
+  ]
+}

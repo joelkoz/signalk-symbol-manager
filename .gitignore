@@ -4,6 +4,8 @@ node_modules/
 *.sqlite-*
 symbols/
 coverage/
+# Build artifacts (rebuilt by `npm run build` / `prepare`, shipped in the npm package)
+plugin/
 public/index.html
 public/assets/
 dist/

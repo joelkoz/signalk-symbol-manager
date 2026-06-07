@@ -34,6 +34,50 @@ repositories. Do not create branches, edit files, or commit changes in
 
 The plugin UI will use React + Fabric.js. Keep upload/source editing as fallback for complex SVGs. 
 
+## Implementation Status and Deviations
+
+This section records how the current implementation maps to this spec.
+
+**Delivery is phased.** Phase 1 (done, verified end-to-end against a local
+Signal K server): the `symbols` resource provider, the plugin manager API,
+SQLite storage, SVG sanitization and asset serving, the four starter templates,
+and the React list-manager UI (new-from-template, metadata editing with
+roles/tags/scale/anchor, fill-color, direct upload, duplicate, delete, and a
+Freeboard-accurate preview). Phase 2 (pending): the full Fabric.js visual editor
+(shape add/select with z-order cycling, draggable anchor overlay, import-shape
+into the POI body box, raw-SVG round-trip, zoom, scale-whole-symbol).
+
+**Deviations from the original spec, with rationale:**
+
+- **The SVG asset URL is served outside `/plugins`.** This spec originally placed
+  the asset at `/plugins/signalk-symbol-manager/symbols/:id.svg`. The Signal K
+  server gates every `/plugins/*` route behind *admin* authentication (and
+  ignores `allow_readonly` there), so an asset under `/plugins` is not loadable by
+  read-only consumers — which defeats public symbol discovery. The asset is
+  therefore served at `/signalk/symbol-manager/symbols/:ref.svg`, registered
+  directly on the app (the same pattern chart-tile plugins use), and each
+  resource's `url` points there. The route references below reflect this.
+
+- **The sanitizer is jsdom-free.** DOMPurify (the candidate named under *SVG
+  Validation and Sanitization*) requires a DOM such as jsdom, which leaks memory
+  at the native/realm level and is a heavy dependency for a Raspberry-Pi target.
+  The implementation instead uses `@xmldom/xmldom` (pure JS) with a strict element
+  allowlist plus attribute scrubbing. It removes the same vectors (scripts, event
+  handlers, `foreignObject`, external references, `javascript:`/`expression()`,
+  unsafe `<style>` CSS, and internal entity definitions) and is leak-free.
+
+- **Write authorization uses the server's built-in `/plugins` admin gate.** The
+  manager API lives under `/plugins/signalk-symbol-manager/...`, which the server
+  already protects with admin authentication, so the plugin adds no auth
+  middleware of its own. Resource-provider `setResource`/`deleteResource` always
+  reject regardless of auth.
+
+- **Nominal width/height are persisted** (in addition to the required fields) so
+  the manager UI and previews can compute Freeboard display size (`width *
+  scale`). These are internal manager metadata and are intentionally NOT added to
+  the public `SymbolDefinition` resource shape (the generic contract defers
+  `size`).
+
 ## General requirements
 Node.js 22.5+ is required because the plugin uses Node's integrated
 `node:sqlite` support for user-managed symbol metadata.
@@ -79,8 +123,10 @@ code unless instructed by the user.
   ```
 
 - Do not mount the manager UI with `registerWithRouter()`.
-- Use `registerWithRouter()` only for plugin-owned API and asset routes under
-  `/plugins/signalk-symbol-manager/...`.
+- Use `registerWithRouter()` for the plugin-owned manager API under
+  `/plugins/signalk-symbol-manager/api/...`. Register the public SVG asset route
+  directly on the app (outside `/plugins`) so read-only consumers can load it —
+  see *Implementation Status and Deviations*.
 - Store user-managed symbol metadata in Node's integrated SQLite database under
   `app.getDataDirPath()`, and store sanitized SVG asset files under the same
   plugin data directory.
@@ -90,8 +136,8 @@ code unless instructed by the user.
   - `POST /plugins/signalk-symbol-manager/api/symbols`
   - `PUT /plugins/signalk-symbol-manager/api/symbols/:id`
   - `DELETE /plugins/signalk-symbol-manager/api/symbols/:id`
-  - `GET /plugins/signalk-symbol-manager/symbols/:id.svg`
-- Sanitize SVG server-side with an SVG allowlist, remove scripts/event handlers/`foreignObject`/external references, enforce size limits, and serve `image/svg+xml`.
+  - `GET /signalk/symbol-manager/symbols/:id.svg` _(public asset route, registered on the app — not under `/plugins`)_
+- Sanitize SVG server-side with an SVG allowlist (`@xmldom/xmldom`, jsdom-free), remove scripts/event handlers/`foreignObject`/external references, enforce size limits, and serve `image/svg+xml`.
 
 ## Runtime Contract
 
@@ -193,7 +239,7 @@ Each symbol resource returned by the provider must include:
   "timestamp": "2026-06-05T12:30:00.000Z",
   "name": "Dive Site",
   "mediaType": "image/svg+xml",
-  "url": "/plugins/signalk-symbol-manager/symbols/dive-site.svg"
+  "url": "/signalk/symbol-manager/symbols/dive-site.svg"
 }
 ```
 
@@ -261,6 +307,7 @@ The SQLite datastore must support:
 - sanitized SVG file references
 - role/tag metadata
 - scale and anchor metadata
+- nominal source width/height (internal; used to compute Freeboard display size for previews)
 - created/updated timestamps
 
 Sanitized SVG assets should be stored as files under the plugin data directory,
@@ -479,10 +526,15 @@ than building a custom tag editor. During implementation, check current package
 health and choose a component that supports TypeScript or clean TypeScript
 wrapping, keyboard entry, tag removal, uniqueness, and accessible labels. Current
 candidates to evaluate include `react-tag-input-component`, `react-tag-input`,
-and `react-tag-autocomplete`.
+and `react-tag-autocomplete`. The implementation uses `react-tag-input-component`.
 
 For complex features, a web search of external open source libraries should
-be checked and used before writing new code (e.g. [DOMPurify](https://github.com/cure53/dompurify) as a candidate for SVG sanitation)
+be checked and used before writing new code. [DOMPurify](https://github.com/cure53/dompurify)
+was the original candidate for SVG sanitation, but it requires a DOM (jsdom on
+the server), which leaks memory natively and is heavy for a Raspberry-Pi target.
+The implementation instead uses [`@xmldom/xmldom`](https://github.com/xmldom/xmldom)
+(pure JS) with a strict element/attribute allowlist — see *SVG Validation and
+Sanitization* and *Implementation Status and Deviations*.
 
 ## SVG Validation and Sanitization
 
@@ -496,6 +548,15 @@ The plugin should reject or remove:
 - external network references
 - unsafe embedded content
 - files above the configured size limit
+
+Implementation: sanitization is a strict **allowlist** over a pure-JS DOM
+(`@xmldom/xmldom`, no jsdom). Only allowlisted SVG elements are kept (so
+`<script>`, `<foreignObject>`, `<a>`, `<iframe>`, and any unknown element are
+dropped); `on*` attributes, `href`/`src`/`xlink:href` that are not local
+fragments / `data:image` / relative URLs, external `url(...)` references,
+`javascript:` and CSS `expression()`, and unsafe `<style>` CSS are stripped;
+internal entity definitions (`<!ENTITY>`) are rejected outright as an
+XXE / billion-laughs guard; and input over the configured byte limit is rejected.
 
 The plugin should serve SVG with:
 
@@ -514,12 +575,26 @@ Signal K WebApp UI route:
 This route is not registered manually by the plugin. Signal K Server creates it
 because the package has the `signalk-webapp` keyword and a `public/` directory.
 
-Plugin API and asset routes registered with `registerWithRouter()`:
+Public SVG asset route, registered directly on the app (NOT via
+`registerWithRouter()`, so it is outside the server's `/plugins` admin gate and
+is loadable by read-only consumers — `:ref` is a local id or a `namespace:id`):
 
 ```text
-/plugins/signalk-symbol-manager/symbols/:id.svg
-/plugins/signalk-symbol-manager/api/symbols
-/plugins/signalk-symbol-manager/api/symbols/:id
+GET /signalk/symbol-manager/symbols/:ref.svg
+```
+
+Manager API routes registered with `registerWithRouter()` (mounted at
+`/plugins/signalk-symbol-manager`, which the server protects with admin auth):
+
+```text
+GET    /plugins/signalk-symbol-manager/api/symbols
+GET    /plugins/signalk-symbol-manager/api/symbols/:ref
+POST   /plugins/signalk-symbol-manager/api/symbols
+PUT    /plugins/signalk-symbol-manager/api/symbols/:ref
+POST   /plugins/signalk-symbol-manager/api/symbols/:ref/duplicate
+DELETE /plugins/signalk-symbol-manager/api/symbols/:ref
+GET    /plugins/signalk-symbol-manager/api/templates
+POST   /plugins/signalk-symbol-manager/api/sanitize
 ```
 
 The public resource-provider surface remains:
@@ -546,6 +621,14 @@ read-only resource access.
 Create, update, upload, and delete operations through the plugin API must require
 appropriate Signal K write/admin authorization. Do not allow unauthenticated
 symbol library mutation.
+
+Implementation: the entire manager API lives under
+`/plugins/signalk-symbol-manager/...`, and the Signal K server already gates every
+`/plugins/*` route behind admin authentication, so mutation is protected by the
+server's built-in admin gate and the plugin adds no auth middleware of its own.
+The public SVG asset route is deliberately placed outside `/plugins`
+(`/signalk/symbol-manager/...`) so symbol reads stay public when the server
+permits read-only access.
 
 Resource-provider `setResource` and `deleteResource` calls must remain read-only
 rejections even for authenticated users. Authentication can authorize the plugin
