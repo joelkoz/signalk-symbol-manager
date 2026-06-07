@@ -24,6 +24,16 @@ const VIEW_W = 460
 const VIEW_H = 380
 const round = (n: number) => Math.round(n * 100) / 100
 
+// Transient state while drawing a multi-point polygon/polyline. The committed
+// edges are individual dashed Line segments; `rubber` tracks the cursor; the
+// `startMarker` shows where to click to close the shape.
+interface DrawState {
+  points: { x: number; y: number }[]
+  segments: fabric.Line[]
+  rubber: fabric.Line
+  startMarker: fabric.Circle
+}
+
 interface Props {
   draft: SymbolDraft
   config: AppConfig
@@ -61,6 +71,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   const histIdxRef = useRef(-1)
   const restoringRef = useRef(false)
   const recordTimerRef = useRef<number | null>(null)
+  const drawRef = useRef<DrawState | null>(null)
 
   const [meta, setMeta] = useState<SymbolMeta>(draftToMeta(draft))
   const [selected, setSelected] = useState<ShapeSnapshot | null>(null)
@@ -72,6 +83,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [canUndo, setCanUndo] = useState(false)
+  const [drawing, setDrawing] = useState(false)
 
   const metaRef = useRef(meta)
   metaRef.current = meta
@@ -208,6 +220,145 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   const undoRef = useRef(undo)
   undoRef.current = undo
 
+  // --- polygon / polyline drawing -----------------------------------------
+  const TEMP_STROKE = '#1f6feb'
+
+  const cleanupDraw = () => {
+    const fc = fcRef.current
+    const st = drawRef.current
+    if (fc && st) {
+      for (const s of st.segments) fc.remove(s)
+      fc.remove(st.rubber)
+      fc.remove(st.startMarker)
+      fc.selection = true
+      fc.skipTargetFind = false
+      fc.defaultCursor = 'default'
+      fc.requestRenderAll()
+    }
+    drawRef.current = null
+    setDrawing(false)
+  }
+
+  const cancelPolygon = () => cleanupDraw()
+
+  const finishPolygon = (closed: boolean) => {
+    const fc = fcRef.current
+    const st = drawRef.current
+    if (!fc || !st) return
+    // De-duplicate consecutive points (handles the double-click finish, whose
+    // two underlying clicks land on the same spot).
+    const tol = 1.5 / fc.getZoom()
+    const pts: { x: number; y: number }[] = []
+    for (const p of st.points) {
+      const last = pts[pts.length - 1]
+      if (!last || Math.hypot(p.x - last.x, p.y - last.y) > tol) pts.push(p)
+    }
+    cleanupDraw()
+    const enough = closed ? pts.length >= 3 : pts.length >= 2
+    if (!enough) {
+      fc.requestRenderAll()
+      return
+    }
+    const shape = closed
+      ? new fabric.Polygon(pts, { fill: '#cccccc', stroke: '#000000', strokeWidth: 1 })
+      : new fabric.Polyline(pts, { fill: '', stroke: '#000000', strokeWidth: 2 })
+    shape.set({ selectable: true })
+    fc.add(shape)
+    if (anchorRef.current) fc.bringObjectToFront(anchorRef.current)
+    fc.setActiveObject(shape)
+    fc.requestRenderAll()
+    setSelected(snapshot(shape))
+    refreshPreview()
+    recordHistory()
+  }
+
+  // A click while drawing: close on the start point (>=3 pts) or add a vertex.
+  const handleDrawClick = (p: { x: number; y: number }) => {
+    const fc = fcRef.current
+    const st = drawRef.current
+    if (!fc || !st) return
+    const tol = 10 / fc.getZoom() // ~10 screen px tolerance around the start
+    if (st.points.length >= 3) {
+      const a = st.points[0]
+      if (Math.hypot(p.x - a.x, p.y - a.y) <= tol) {
+        finishPolygon(true)
+        return
+      }
+    }
+    if (st.points.length === 0) {
+      st.startMarker.set({ left: p.x, top: p.y, visible: true })
+      st.startMarker.setCoords()
+      fc.bringObjectToFront(st.startMarker)
+    } else {
+      const prev = st.points[st.points.length - 1]
+      const seg = new fabric.Line([prev.x, prev.y, p.x, p.y], {
+        stroke: TEMP_STROKE,
+        strokeWidth: 1,
+        selectable: false,
+        evented: false,
+        excludeFromExport: true,
+        strokeDashArray: [4, 3]
+      })
+      fc.add(seg)
+      st.segments.push(seg)
+      fc.bringObjectToFront(st.startMarker)
+      if (anchorRef.current) fc.bringObjectToFront(anchorRef.current)
+    }
+    st.points.push(p)
+    fc.requestRenderAll()
+  }
+
+  const moveRubber = (p: { x: number; y: number }) => {
+    const fc = fcRef.current
+    const st = drawRef.current
+    if (!fc || !st || st.points.length === 0) return
+    const last = st.points[st.points.length - 1]
+    st.rubber.set({ x1: last.x, y1: last.y, x2: p.x, y2: p.y, visible: true })
+    st.rubber.setCoords()
+    fc.requestRenderAll()
+  }
+
+  const beginPolygon = () => {
+    const fc = fcRef.current
+    if (!fc) return
+    if (drawRef.current) cleanupDraw()
+    fc.discardActiveObject()
+    setSelected(null)
+    fc.selection = false
+    fc.skipTargetFind = true
+    fc.defaultCursor = 'crosshair'
+    const rubber = new fabric.Line([0, 0, 0, 0], {
+      stroke: TEMP_STROKE,
+      strokeWidth: 1,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+      strokeDashArray: [4, 3],
+      visible: false
+    })
+    const r = Math.max(2, Math.max(dims.current.W, dims.current.H) / 50)
+    const startMarker = new fabric.Circle({
+      radius: r,
+      fill: '',
+      stroke: TEMP_STROKE,
+      strokeWidth: 1,
+      originX: 'center',
+      originY: 'center',
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+      visible: false
+    })
+    fc.add(rubber)
+    fc.add(startMarker)
+    drawRef.current = { points: [], segments: [], rubber, startMarker }
+    setDrawing(true)
+  }
+  const beginPolygonRef = useRef(beginPolygon)
+  beginPolygonRef.current = beginPolygon
+  const cancelPolygonRef = useRef(cancelPolygon)
+  cancelPolygonRef.current = cancelPolygon
+
   // --- init / teardown ----------------------------------------------------
   useEffect(() => {
     let disposed = false
@@ -220,6 +371,38 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       selection: true
     })
     fcRef.current = fc
+    if (import.meta.env.DEV) {
+      ;(window as unknown as { __fc?: unknown }).__fc = fc
+    }
+
+    // Make the selected object "sticky" for dragging. With preserveObjectStacking
+    // (needed so click-cycling doesn't reorder z), Fabric's default findTarget
+    // returns the TOP-most object under the pointer on mouse-down, which steals
+    // the drag from a shape you cycled to underneath. Here, if a single object is
+    // selected and you press inside its bounding box, keep it as the target so it
+    // can be dragged. Selection changes still happen via the click-cycle on
+    // mouse-up (a click without a drag). Controls (resize/rotate handles) and the
+    // anchor fall through to the default behaviour.
+    const baseFindTarget = fc.findTarget.bind(fc)
+    type FT = typeof baseFindTarget
+    const stickyFindTarget: FT = (e) => {
+      const active = fc.getActiveObject()
+      if (
+        active &&
+        !isAnchor(active) &&
+        !drawRef.current &&
+        fc.getActiveObjects().length === 1 &&
+        !active.findControl(
+          fc.getViewportPoint(e as Parameters<typeof fc.getViewportPoint>[0]),
+          false
+        )
+      ) {
+        const sp = fc.getScenePoint(e as Parameters<typeof fc.getScenePoint>[0])
+        if (active.containsPoint(sp)) return active
+      }
+      return baseFindTarget(e)
+    }
+    ;(fc as unknown as { findTarget: FT }).findTarget = stickyFindTarget
 
     const size = svgSize(draft.svg)
     const W = draft.width ?? (size.viewBox ? size.viewBox[2] : 100)
@@ -253,9 +436,22 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     type PtArg = Parameters<typeof fc.getScenePoint>[0]
     const onDown = (opt: { e: Event }) => {
       const p = fc.getScenePoint(opt.e as PtArg)
+      if (drawRef.current) {
+        handleDrawClick({ x: p.x, y: p.y })
+        return
+      }
       down.current = { x: p.x, y: p.y }
     }
+    const onMove = (opt: { e: Event }) => {
+      if (!drawRef.current) return
+      const p = fc.getScenePoint(opt.e as PtArg)
+      moveRubber({ x: p.x, y: p.y })
+    }
+    const onDblClick = () => {
+      if (drawRef.current) finishPolygon(false)
+    }
     const onUp = (opt: { e: Event }) => {
+      if (drawRef.current) return
       const p = fc.getScenePoint(opt.e as PtArg)
       const d = down.current
       down.current = null
@@ -291,6 +487,8 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       recordHistory()
     })
     fc.on('mouse:down', onDown)
+    fc.on('mouse:move', onMove)
+    fc.on('mouse:dblclick', onDblClick)
     fc.on('mouse:up', onUp)
     ;(async () => {
       try {
@@ -361,6 +559,12 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       const t = e.target as HTMLElement | null
       const tag = t?.tagName
       const inField = tag === 'INPUT' || tag === 'TEXTAREA' || !!t?.isContentEditable
+      // Esc cancels an in-progress polygon.
+      if (e.key === 'Escape' && drawRef.current) {
+        e.preventDefault()
+        cancelPolygonRef.current()
+        return
+      }
       // Undo: Cmd/Ctrl-Z (let the browser handle it while typing in a field).
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         if (inField) return
@@ -385,6 +589,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
   const addShape = (kind: ShapeKind) => {
     const fc = fcRef.current
     if (!fc) return
+    if (drawRef.current) cleanupDraw()
     const { W, H } = dims.current
     const o = makeShape(kind, W / 2, H / 2, Math.max(12, Math.min(W, H) * 0.5))
     fc.add(o)
@@ -642,6 +847,13 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
             <button onClick={() => addShape('line')} className="tip" aria-label="Add a line">╱</button>
             <button onClick={() => addShape('arrow')} className="tip" aria-label="Add an arrow">→</button>
             <button onClick={() => addShape('text')} className="tip" aria-label="Add a text label">T</button>
+            <button
+              onClick={() => (drawing ? cancelPolygon() : beginPolygon())}
+              className={drawing ? 'tip active' : 'tip'}
+              aria-label="Draw a polygon / polyline: click each point; double-click to finish as a line, or click the start point to close the shape"
+            >
+              ⬠
+            </button>
             <button onClick={onImportClick} className="tip" aria-label="Import an external SVG file as a shape">
               Import
             </button>
@@ -675,8 +887,17 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
             <canvas ref={canvasElRef} width={VIEW_W} height={VIEW_H} />
           </div>
           <div className="editor-hint">
-            Click a shape to select; click again to cycle through overlapping
-            shapes. Drag the blue ⊕ to set the anchor point.
+            {drawing ? (
+              <strong>
+                Polygon: click each point. Double-click to finish as a line, or
+                click the start point to close the shape. Esc cancels.
+              </strong>
+            ) : (
+              <>
+                Click a shape to select; click again to cycle through overlapping
+                shapes. Drag the blue ⊕ to set the anchor point.
+              </>
+            )}
           </div>
           <button
             className="link tip"
