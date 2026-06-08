@@ -137,7 +137,7 @@ export function SymbolForm({ draft, config, onSaved, onCancel }: Props) {
 
         <div className="editor-props">
           <h3>Properties</h3>
-          <MetadataFields meta={meta} onChange={update} config={config} idLocked={draft.mode === 'edit'} />
+          <MetadataFields meta={meta} onChange={update} config={config} editing={draft.mode === 'edit'} />
           {hasFillTarget ? (
             <label className="fill-field">
               Fill color

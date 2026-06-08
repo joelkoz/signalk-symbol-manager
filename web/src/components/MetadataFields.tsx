@@ -9,14 +9,16 @@ interface Props {
   meta: SymbolMeta
   onChange: (patch: Partial<SymbolMeta>) => void
   config: AppConfig
-  idLocked: boolean
+  // True when editing an existing symbol. Id/namespace stay editable (changing
+  // them renames the symbol), but we surface a hint so it isn't a surprise.
+  editing: boolean
 }
 
 export function isMapMarker(roles: string[], config: AppConfig): boolean {
   return roles.some((r) => config.mapMarkerRoles.includes(r))
 }
 
-export function MetadataFields({ meta, onChange, config, idLocked }: Props) {
+export function MetadataFields({ meta, onChange, config, editing }: Props) {
   const mapMarker = isMapMarker(meta.roles, config)
 
   const toggleRole = (role: string) => {
@@ -33,7 +35,6 @@ export function MetadataFields({ meta, onChange, config, idLocked }: Props) {
         <input
           value={meta.id}
           onChange={(e) => onChange({ id: e.target.value })}
-          disabled={idLocked}
           placeholder="dive-site"
         />
       </label>
@@ -42,9 +43,14 @@ export function MetadataFields({ meta, onChange, config, idLocked }: Props) {
         <input
           value={meta.namespace}
           onChange={(e) => onChange({ namespace: e.target.value })}
-          disabled={idLocked}
         />
       </label>
+      {editing ? (
+        <p className="field-hint">
+          Changing the id or namespace renames this symbol (and the SVG file on
+          disk). Apps referencing the old id will need updating.
+        </p>
+      ) : null}
       <label>
         Name
         <input

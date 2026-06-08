@@ -604,6 +604,12 @@ legend {
   border-radius: 6px;
   font: inherit;
 }
+.metadata-fields .field-hint {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
 
 /* --- tag input (react-tag-input-component) --- */
 .rti--container {

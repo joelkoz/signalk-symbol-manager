@@ -118,6 +118,49 @@ test('update edits metadata and delete removes symbol + asset', () => {
   assert.ok(!fs.existsSync(assetPath))
 })
 
+test('update renames id/namespace, moving the asset and key', () => {
+  const rec = service.create({ id: 'old-id', name: 'Old', svg: SVG })
+  const oldAsset = path.join(dir, 'assets', rec.svgFile)
+  assert.ok(fs.existsSync(oldAsset))
+
+  const upd = service.update('user:old-id', {
+    id: 'new-id',
+    namespace: 'mine',
+    name: 'New',
+    svg: SVG
+  })
+  assert.equal(upd.id, 'new-id')
+  assert.equal(upd.namespace, 'mine')
+
+  // Old identity is gone; new identity resolves; old asset file moved.
+  assert.throws(() => service.resolve('user:old-id'), (e) => e.status === 404)
+  assert.equal(service.resolve('mine:new-id').name, 'New')
+  assert.ok(!fs.existsSync(oldAsset))
+  assert.ok(fs.existsSync(path.join(dir, 'assets', upd.svgFile)))
+})
+
+test('rename onto an existing identity is rejected', () => {
+  service.create({ id: 'a', name: 'A', svg: SVG })
+  service.create({ id: 'b', name: 'B', svg: SVG })
+  assert.throws(
+    () => service.update('user:a', { id: 'b', name: 'A', svg: SVG }),
+    (e) => {
+      assert.equal(e.status, 409)
+      return true
+    }
+  )
+  // The failed rename left the original untouched.
+  assert.equal(service.resolve('user:a').name, 'A')
+})
+
+test('update without id/namespace keeps the current identity', () => {
+  service.create({ id: 'a', name: 'A', svg: SVG })
+  const upd = service.update('user:a', { name: 'A2' })
+  assert.equal(upd.id, 'a')
+  assert.equal(upd.namespace, 'user')
+  assert.equal(upd.name, 'A2')
+})
+
 test('duplicate id within same namespace is rejected', () => {
   service.create({ id: 'a', name: 'A', svg: SVG })
   assert.throws(() => service.create({ id: 'a', name: 'A2', svg: SVG }), (e) => {

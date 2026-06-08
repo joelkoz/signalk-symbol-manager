@@ -222,7 +222,22 @@ export class SymbolService {
   update(reference: string, input: SymbolInput): SymbolRecord {
     const target = this.resolve(reference)
     const meta = this.normalizeMetadata(input, false)
-    return this.store.update(target.namespace, target.id, {
+    // A save may rename the symbol. When the payload carries an id/namespace
+    // that differs from the resolved target, move the identity (and its asset)
+    // first, then update metadata against the new identity. Absent/blank
+    // id/namespace means "keep current".
+    const newNamespace =
+      typeof input.namespace === 'string' && input.namespace !== ''
+        ? validateNamespace(input.namespace)
+        : target.namespace
+    const newId =
+      typeof input.id === 'string' && input.id !== ''
+        ? validateLocalId(input.id)
+        : target.id
+    if (newNamespace !== target.namespace || newId !== target.id) {
+      this.store.rename(target.namespace, target.id, newNamespace, newId)
+    }
+    return this.store.update(newNamespace, newId, {
       name: meta.name,
       description: meta.description,
       roles: meta.roles,

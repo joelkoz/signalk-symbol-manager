@@ -1141,7 +1141,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
                   meta={meta}
                   onChange={updateMeta}
                   config={config}
-                  idLocked={draft.mode === 'edit'}
+                  editing={draft.mode === 'edit'}
                 />
               </>
             )}

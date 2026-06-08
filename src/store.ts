@@ -217,8 +217,9 @@ export class SymbolStore {
     return this.get(input.namespace, input.id)!
   }
 
-  // Update an existing symbol. `namespace`/`id` identify the target; the id and
-  // namespace themselves are immutable in this MVP (rename = duplicate+delete).
+  // Update an existing symbol's metadata/SVG. `namespace`/`id` identify the
+  // target; to change the identity itself, call `rename` first (the service
+  // does this automatically when a save carries a new id/namespace).
   update(
     namespace: string,
     id: string,
@@ -269,6 +270,48 @@ export class SymbolStore {
         id
       )
     return this.get(namespace, id)!
+  }
+
+  // Rename a symbol's identity (namespace and/or id). Moves the SVG asset on
+  // disk and rewrites the primary key. Rejects (409) if the new identity is
+  // already taken. A no-op when the identity is unchanged.
+  rename(
+    oldNamespace: string,
+    oldId: string,
+    newNamespace: string,
+    newId: string
+  ): void {
+    const existing = this.get(oldNamespace, oldId)
+    if (!existing) {
+      throw new ValidationError(
+        `symbol ${canonicalKey(oldNamespace, oldId)} not found`,
+        404
+      )
+    }
+    validateNamespace(newNamespace)
+    validateLocalId(newId)
+    if (oldNamespace === newNamespace && oldId === newId) return
+    if (this.exists(newNamespace, newId)) {
+      throw new ValidationError(
+        `symbol ${canonicalKey(newNamespace, newId)} already exists`,
+        409
+      )
+    }
+    const newRel = this.assetRelPath(newNamespace, newId)
+    const newAbs = this.assetAbsPath(newRel)
+    fs.mkdirSync(path.dirname(newAbs), { recursive: true })
+    const oldAbs = this.assetAbsPath(existing.svgFile)
+    if (fs.existsSync(oldAbs)) {
+      fs.renameSync(oldAbs, newAbs)
+    }
+    const now = new Date().toISOString()
+    this.db
+      .prepare(
+        `UPDATE symbols
+            SET namespace = ?, id = ?, svgFile = ?, updatedAt = ?
+          WHERE namespace = ? AND id = ?`
+      )
+      .run(newNamespace, newId, newRel, now, oldNamespace, oldId)
   }
 
   delete(namespace: string, id: string): boolean {
