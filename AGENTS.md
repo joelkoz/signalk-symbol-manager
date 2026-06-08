@@ -60,18 +60,22 @@ deliberate and is noted in `REQUIREMENTS.md`.
 
 ## Local Signal K dev server
 
-This workspace runs Signal K via `signalk-server-node/bin/n2k-from-file`,
-which has a long-standing memory leak unrelated to this plugin and will OOM
-after ~10–15 minutes on the default Node heap. Launch it with a larger heap
-when investigating issues that need uptime:
+This workspace runs Signal K via `signalk-server-node/bin/n2k-from-file`.
 
-```sh
-PORT=3000 NODE_OPTIONS="--max-old-space-size=8192" \
-  signalk-server-node/bin/n2k-from-file
-```
+**Known issue — mDNS cache exhaustion** ([SignalK/signalk-server#2761](https://github.com/SignalK/signalk-server/issues/2761)):
+`@astronautlabs/mdns` (introduced upstream in PR #2601) caches every mDNS
+record from the wire with no size cap. On a home LAN with many Apple devices
+this causes OOM/`Abort trap: 6` in ~10–15 minutes. This is **not a plugin
+bug**.
 
-This is an environment workaround. **Do not** edit `signalk-server-node` to
-work around it — the workspace rule forbids changes outside this plugin.
+**Workaround:** `"mdns": false` is already set in
+`signalk-server-node/settings/n2k-from-file-settings.json`, which disables
+the mDNS subsystem for local dev. Do not remove that setting until
+[issue #2761](https://github.com/SignalK/signalk-server/issues/2761) is
+resolved upstream.
+
+**Do not** edit `signalk-server-node` beyond the settings file — the
+workspace rule forbids unrelated changes outside this plugin.
 
 The plugin must remain a normal Signal K server plugin and Signal K Plugin
 WebApp. It should not require a custom Signal K server build for end users. The

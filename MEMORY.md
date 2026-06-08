@@ -54,11 +54,14 @@ Working notes for agents. Read alongside `README.md` and `REQUIREMENTS.md`.
 
 ## Known environment issue (NOT the plugin)
 
-- The local `bin/n2k-from-file` SK server OOMs/aborts (`Abort trap: 6`, heap to
-  ~4 GB) after being left running ~10–15 min, even idle. The user confirmed this
-  predates the plugin (seen the same morning before any plugin code existed). It
-  is a server/environment issue; the plugin handled only a handful of requests
-  before the crash and is not the cause. Don't chase it as a plugin bug.
+- The local `bin/n2k-from-file` SK server OOMs/aborts (`Abort trap: 6`) after
+  ~10–15 min on a noisy LAN. **Root cause identified:** `@astronautlabs/mdns`
+  (introduced upstream in PR #2601) caches every mDNS record from the wire with
+  no size cap; on a home LAN with many Apple devices the cache fills heap.
+  Reported as [SignalK/signalk-server#2761](https://github.com/SignalK/signalk-server/issues/2761).
+  **Workaround applied:** `"mdns": false` is now set in
+  `signalk-server-node/settings/n2k-from-file-settings.json`. Do not remove it
+  until the upstream issue is resolved. This is not a plugin bug.
 
 ## Build / run gotchas
 
