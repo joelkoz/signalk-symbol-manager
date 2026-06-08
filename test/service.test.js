@@ -98,10 +98,33 @@ test('asset url switches to qualified form when local id is ambiguous', () => {
 
 test('duplicate creates an independent copy', () => {
   service.create({ id: 'a', name: 'A', svg: SVG })
-  const copy = service.duplicate('user:a', 'b', 'B')
+  const copy = service.duplicate('user:a', 'b', undefined, 'B')
   assert.equal(copy.id, 'b')
+  assert.equal(copy.namespace, 'user')
   assert.equal(copy.name, 'B')
   assert.equal(service.list().length, 2)
+})
+
+test('duplicate can reuse the same id under a different namespace', () => {
+  service.create({ id: 'a', name: 'A', svg: SVG })
+  const copy = service.duplicate('user:a', 'a', 'mine')
+  assert.equal(copy.id, 'a')
+  assert.equal(copy.namespace, 'mine')
+  // Same id + different namespace coexist.
+  assert.equal(service.list().length, 2)
+  assert.equal(service.resolve('user:a').namespace, 'user')
+  assert.equal(service.resolve('mine:a').namespace, 'mine')
+})
+
+test('duplicate into the same namespace+id is rejected', () => {
+  service.create({ id: 'a', name: 'A', svg: SVG })
+  assert.throws(
+    () => service.duplicate('user:a', 'a', 'user'),
+    (e) => {
+      assert.equal(e.status, 409)
+      return true
+    }
+  )
 })
 
 test('update edits metadata and delete removes symbol + asset', () => {

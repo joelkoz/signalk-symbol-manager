@@ -51,7 +51,7 @@ name, description, roles, tags, and per-row actions:
 | Action      | What it does                                                                |
 |-------------|-----------------------------------------------------------------------------|
 | **Edit**    | Open the visual editor on this symbol.                                      |
-| **Duplicate** | Make a copy under a new id (e.g. `dive-site` → `dive-site-2`).            |
+| **Duplicate** | Copy the symbol. A dialog asks for the new **id** and **namespace** — keep the id and change the namespace to make an alternate of the original under `namespace:id`. |
 | **Delete**  | Remove the symbol from the library (and its SVG file from disk).            |
 
 Across the top:

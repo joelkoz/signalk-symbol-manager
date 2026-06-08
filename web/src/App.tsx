@@ -10,6 +10,7 @@ import { SymbolList } from './components/SymbolList'
 import { TemplatePicker } from './components/TemplatePicker'
 import { SymbolForm } from './components/SymbolForm'
 import { FabricEditor } from './components/FabricEditor'
+import { DuplicateDialog } from './components/DuplicateDialog'
 
 type View =
   | { kind: 'list' }
@@ -23,6 +24,11 @@ export function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<View>({ kind: 'list' })
+  // Symbol awaiting the Duplicate dialog (null = dialog closed), plus its own
+  // error/busy state so a collision shows inline without closing the dialog.
+  const [duplicating, setDuplicating] = useState<SymbolView | null>(null)
+  const [dupError, setDupError] = useState<string | null>(null)
+  const [dupBusy, setDupBusy] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const refresh = async () => {
@@ -133,15 +139,23 @@ export function App() {
   }
 
   // --- Duplicate / Delete -------------------------------------------------
-  const onDuplicate = async (s: SymbolView) => {
-    const newId = window.prompt(`Duplicate "${s.id}" as new id:`, `${s.id}-copy`)
-    if (!newId) return
-    setError(null)
+  const onDuplicate = (s: SymbolView) => {
+    setDupError(null)
+    setDuplicating(s)
+  }
+
+  const doDuplicate = async (newId: string, newNamespace: string) => {
+    if (!duplicating) return
+    setDupError(null)
+    setDupBusy(true)
     try {
-      await api.duplicate(s.key, newId)
+      await api.duplicate(duplicating.key, newId, newNamespace || undefined)
+      setDuplicating(null)
       await refresh()
     } catch (e) {
-      setError((e as Error).message)
+      setDupError((e as Error).message)
+    } finally {
+      setDupBusy(false)
     }
   }
 
@@ -198,6 +212,16 @@ export function App() {
 
       {view.kind === 'pick-template' ? (
         <TemplatePicker onPick={pickTemplate} onCancel={() => setView({ kind: 'list' })} />
+      ) : null}
+
+      {duplicating ? (
+        <DuplicateDialog
+          source={duplicating}
+          error={dupError}
+          busy={dupBusy}
+          onSubmit={doDuplicate}
+          onCancel={() => setDuplicating(null)}
+        />
       ) : null}
 
       {view.kind === 'editor' && config ? (

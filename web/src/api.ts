@@ -48,10 +48,15 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body)
     }),
-  duplicate: (ref: string, newId: string, newName?: string) =>
+  duplicate: (
+    ref: string,
+    newId: string,
+    newNamespace?: string,
+    newName?: string
+  ) =>
     request<SymbolView>(`/symbols/${encodeURIComponent(ref)}/duplicate`, {
       method: 'POST',
-      body: JSON.stringify({ newId, newName })
+      body: JSON.stringify({ newId, newNamespace, newName })
     }),
   remove: (ref: string) =>
     request<{ deleted: string }>(`/symbols/${encodeURIComponent(ref)}`, {

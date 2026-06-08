@@ -127,7 +127,12 @@ export function registerManagerApi(
     send(res, log, () => {
       res.status(201)
       return managerView(
-        getService().duplicate(ref(req), req.body?.newId, req.body?.newName)
+        getService().duplicate(
+          ref(req),
+          req.body?.newId,
+          req.body?.newNamespace,
+          req.body?.newName
+        )
       )
     })
   )

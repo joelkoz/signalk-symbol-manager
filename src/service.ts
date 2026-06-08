@@ -250,13 +250,25 @@ export class SymbolService {
     })
   }
 
-  duplicate(reference: string, newId: string, newName?: string): SymbolRecord {
+  duplicate(
+    reference: string,
+    newId: string,
+    newNamespace?: string,
+    newName?: string
+  ): SymbolRecord {
     const source = this.resolve(reference)
     const id = validateLocalId(newId)
+    // Default to the source namespace; an explicit namespace lets the copy
+    // reuse the same id under a different namespace (store.create rejects an
+    // exact namespace+id collision with 409).
+    const namespace =
+      typeof newNamespace === 'string' && newNamespace.trim() !== ''
+        ? validateNamespace(newNamespace.trim())
+        : source.namespace
     const svg = this.store.readAsset(source)
     return this.store.create({
       id,
-      namespace: source.namespace,
+      namespace,
       name: newName?.trim() || `${source.name} (copy)`,
       description: source.description,
       roles: source.roles,

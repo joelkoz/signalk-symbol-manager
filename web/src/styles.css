@@ -203,7 +203,9 @@ button.link {
 }
 .modal-actions {
   margin-top: 16px;
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .template-grid {
   display: grid;
