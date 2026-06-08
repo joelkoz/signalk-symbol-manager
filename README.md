@@ -1,5 +1,7 @@
 # Signal K Symbol Manager
 
+Create and manage a library of symbols for your charts. Waypoints, note markers, etc.
+
 Symbol Manager is a plugin for your Signal K server that acts as both a "symbol resource provider" as well as a web app for building and managing a library of
 custom SVG symbols — note markers, waypoints, map pins, flags, status icons —
 that symbol-aware Signal K apps (like Freeboard-SK) can display on your charts

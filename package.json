@@ -1,7 +1,7 @@
 {
   "name": "signalk-symbol-manager",
   "version": "0.1.0",
-  "description": "Signal K server plugin and WebApp that manages a user-defined library of SVG symbols and exposes them as a read-only `symbols` resource provider for symbol-aware apps such as Freeboard-SK.",
+  "description": "Create and manage chart symbols (icons for waypoints, notes, etc.)",
   "main": "plugin/index.js",
   "scripts": {
     "dev": "vite",
@@ -26,12 +26,14 @@
     "freeboard"
   ],
   "signalk": {
+    "appIcon": "assets/symbol-manager.png",
     "displayName": "Symbol Manager"
   },
   "files": [
     "plugin",
     "public",
     "templates",
+    "assets",
     "README.md",
     "REQUIREMENTS.md",
     "AGENTS.md",
