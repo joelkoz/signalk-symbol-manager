@@ -5,87 +5,33 @@ This document is for AI agents implementing or reviewing this plugin.
 ## Purpose
 
 This plugin provides a user-managed SVG symbol library and exposes it as a
-Signal K resource provider under:
+Signal K resource provider under the `symbols` resource type. It is both:
 
-```text
-symbols
-```
+- a useful end-user app for creating and managing custom symbols, and
+- the reference implementation for the `symbols` Signal K resource contract.
 
-The plugin is both:
+The `symbols` resource type and API contract are documented in
+**[`symbols-api.md`](symbols-api.md)** in this repository. That document is
+the community-facing spec intended for submission to the Signal K server
+documentation (as a proposed resource API). Agents implementing or reviewing
+this plugin should read `symbols-api.md` first to understand the resource
+shape, identity rules, symbol resolution, and provider/consumer requirements.
+This document covers only the plugin-specific implementation details.
 
-- a useful end-user app for creating and managing custom symbols
-- a reference implementation for the generic Signal K symbol resource
-  contract
-- NOT tied directly to the Signal K `Freeboard SK` webapp, though Freeboard
-will be the reference consumer app
+Symbol Manager implementation work is standalone. Do not create
+branches, edit files, or commit changes in the repos `signalk-server` nor
+`freeboard-sk`.
 
-The authoritative implementation spec is:
+The plugin UI uses React + Fabric.js. Keep upload/source editing as fallback
+for complex SVGs.
 
-```text
-../freeboard-extension-spec/rfc-symbol-resource-provider.md
-```
+## Implementation Notes
 
-Symbol Manager implementation work is standalone. Use a
-`symbol-resource-provider` branch in this repository only.
-
-This plugin repository is independent from the Signal K server and Freeboard-SK
-repositories. Do not create branches, edit files, or commit changes in
-`../signalk-server-node` or `../freeboard-sk` while implementing this plugin.
-
-The plugin UI will use React + Fabric.js. Keep upload/source editing as fallback for complex SVGs. 
-
-## Implementation Status and Deviations
-
-This section records how the current implementation maps to this spec.
-
-**Delivery is phased.** Phase 1 (done, verified end-to-end against a local
-Signal K server): the `symbols` resource provider, the plugin manager API,
-SQLite storage, SVG sanitization and asset serving, the four starter templates,
-and the React list-manager UI (new-from-template, metadata editing with
-roles/tags/scale/anchor, fill-color, direct upload, duplicate, delete, and a
-Freeboard-accurate preview). Phase 2 (implemented): the Fabric.js visual editor
-for New/Edit (`FabricEditor`) — shape add/select with z-order click-cycling,
-draggable editor-only anchor overlay, contextual shape properties
-(X/Y/W/H, fill/outline), import-shape with POI body-box placement, raw-SVG
-view/edit, zoom/fit, and export→sanitize→save. Direct upload still uses the
-simpler metadata-only form, bypassing the editor as specified.
-
-> Note: the web app is intentionally not wrapped in `<React.StrictMode>` because
+> **Fabric.js gotcha — do not use `<React.StrictMode>`.**
 > StrictMode's development double-invocation mounts and disposes the Fabric.js
-> canvas twice, corrupting the imperatively-managed editor (production React does
-> not double-invoke). The Freeboard preview defaults to 1× magnification and does
-> not draw the anchor marker (the draggable anchor lives on the editor canvas).
-
-**Deviations from the original spec, with rationale:**
-
-- **The SVG asset URL is served outside `/plugins`.** This spec originally placed
-  the asset at `/plugins/signalk-symbol-manager/symbols/:id.svg`. The Signal K
-  server gates every `/plugins/*` route behind *admin* authentication (and
-  ignores `allow_readonly` there), so an asset under `/plugins` is not loadable by
-  read-only consumers — which defeats public symbol discovery. The asset is
-  therefore served at `/signalk/symbol-manager/symbols/:ref.svg`, registered
-  directly on the app (the same pattern chart-tile plugins use), and each
-  resource's `url` points there. The route references below reflect this.
-
-- **The sanitizer is jsdom-free.** DOMPurify (the candidate named under *SVG
-  Validation and Sanitization*) requires a DOM such as jsdom, which leaks memory
-  at the native/realm level and is a heavy dependency for a Raspberry-Pi target.
-  The implementation instead uses `@xmldom/xmldom` (pure JS) with a strict element
-  allowlist plus attribute scrubbing. It removes the same vectors (scripts, event
-  handlers, `foreignObject`, external references, `javascript:`/`expression()`,
-  unsafe `<style>` CSS, and internal entity definitions) and is leak-free.
-
-- **Write authorization uses the server's built-in `/plugins` admin gate.** The
-  manager API lives under `/plugins/signalk-symbol-manager/...`, which the server
-  already protects with admin authentication, so the plugin adds no auth
-  middleware of its own. Resource-provider `setResource`/`deleteResource` always
-  reject regardless of auth.
-
-- **Nominal width/height are persisted** (in addition to the required fields) so
-  the manager UI and previews can compute Freeboard display size (`width *
-  scale`). These are internal manager metadata and are intentionally NOT added to
-  the public `SymbolDefinition` resource shape (the generic contract defers
-  `size`).
+> canvas twice, corrupting the imperatively-managed editor. The omission is
+> deliberate. The Freeboard preview defaults to 1× magnification and does not
+> draw the anchor marker (the draggable anchor lives on the editor canvas only).
 
 ## General requirements
 Node.js 22.5+ is required because the plugin uses Node's integrated
@@ -135,7 +81,7 @@ code unless instructed by the user.
 - Use `registerWithRouter()` for the plugin-owned manager API under
   `/plugins/signalk-symbol-manager/api/...`. Register the public SVG asset route
   directly on the app (outside `/plugins`) so read-only consumers can load it —
-  see *Implementation Status and Deviations*.
+  see *HTTP Routes* and *Authorization*.
 - Store user-managed symbol metadata in Node's integrated SQLite database under
   `app.getDataDirPath()`, and store sanitized SVG asset files under the same
   plugin data directory.
@@ -166,8 +112,8 @@ setResource
 deleteResource
 ```
 
-Signal K requires all four methods for provider registration, but the first MVP
-must treat the resource-provider surface as read-only:
+Signal K requires all four methods for provider registration. The
+resource-provider surface is read-only:
 
 - `listResources` must return the managed symbol collection.
 - `getResource` must return one managed symbol by resource id.
@@ -231,10 +177,9 @@ Asset routes may use local ids only where the route can unambiguously identify
 the symbol. Public resource API keys must use the canonical `namespace:id`
 resource id.
 
-All symbols managed by the first MVP originate from this plugin. The provider
-must not act as a generic multi-provider symbol store. If two providers expose
-the same `namespace:id` consumer reference, the winning symbol is undefined for
-the first version.
+All symbols originate from this plugin. The provider must not act as a
+generic multi-provider symbol store. If two providers expose the same
+`namespace:id` consumer reference, the winning symbol is undefined.
 
 ## Symbol Resource Shape
 
@@ -380,63 +325,43 @@ the editor appears. The initial template list should come from an extensable `.j
 - `Blank`
 
 The `POI` template should visually match the Freeboard-SK POI note marker
-style, including its anchor point at the tip of the symbol in the lower left. The reference asset is:
-
-```text
-../freeboard-sk/src/assets/img/poi/dive-site.svg
-```
-
-That reference is a red note marker with a white stripe. The Symbol Manager
-`POI` starter must use the same note-marker shape, but without the white
-stripe, so the starter is a plain editable colored note marker. The editor must
-provide a fill color picker that can change the note marker fill color.
+style, including its anchor point at the tip of the symbol in the lower left.
+Freeboard POI markers are "tag" shaped — a rounded rectangle body tapering to a
+point at the lower-left, with a small circular hole near the point.
+The Freeboard reference is a red note marker with a white diagonal stripe.
+The Symbol Manager `POI` starter must use the same note-marker shape, but
+without the white stripe, so the starter is a plain editable colored note
+marker. The editor must provide a fill color picker that can change the note
+marker fill color.
 
 
-The `Flag` template should be an asset that appears as a flag.
-One possible reference asset is:
+The `Flag` template should be an asset that appears as a flag on a staff, with
+the anchor at the base of the staff.
 
-```text
-../freeboard-extension-spec/map-flag-example.svg
-```
-
-A possible `Waypoint` reference asset is:
-
-```text
-../freeboard-extension-spec/waypoint-example.svg
-```
+The `Waypoint` template should be a classic map-pin teardrop shape (circular
+head tapering to a point at the bottom) with a center dot, implemented as a
+closed polygon so outline color/width and fill work correctly in the editor.
 
 The template should also pre-populate the `roles`, `tags`, `scale`, and `anchor`
 structure with defaults specified in the template definition `.json` file.
 Templates with `note`, `waypoint`, or `map-marker` roles must define `scale` and
 `anchor`.
 
-### Freboard Reference Information
+### Freeboard Reference Information
 
 FOR IMPLEMENTATION REFERENCE ONLY!
 
-Freeboard POI icon definitions (i.e. POI) use:
+Freeboard-SK POI icon definitions use:
 
 ```ts
 scale: 0.65
 anchor: [1, 37]
 ```
 
-Freeboard-SK currently registers POI note icons in:
-
-```text
-../freeboard-sk/src/app/modules/icons/poi.ts
-```
-
-Freeboard-SK builds map image styles in:
-
-```text
-../freeboard-sk/src/app/modules/map/ol/lib/map-image-registry.service.ts
-```
-
-The registry creates an OpenLayers `Icon` with the icon path as `src`, applies
-the configured `scale` and `anchor`, and sets `anchorXUnits` and `anchorYUnits`
-to `pixels`. Symbol Manager previews for Freeboard-SK map note usage must
-therefore render the symbol as:
+Freeboard-SK builds map image styles using an OpenLayers `Icon` with the icon
+URL as `src`, applying the configured `scale` and `anchor` with
+`anchorXUnits` and `anchorYUnits` set to `pixels`. Symbol Manager previews for
+Freeboard-SK map note usage must therefore render the symbol as:
 
 ```text
 displayed width = source SVG width * scale
@@ -523,27 +448,22 @@ is reached, the "top" shape is selected again.
   the point that is the anchor point. Moving this icon around the image
   will automatically update the "anchor point" metadata. This visual
   representation is "editor only" and should not be made part of the
-  SVG source. A suggested reference image for this is `../freeboard-extension-spec/boat-anchor-example.svg`
+  SVG source. A small boat-anchor icon or crosshair symbol is a suitable
+  visual for the draggable marker.
   
   
 ## Software stack
 
 The plugin UI will use React + Fabric.js. Fabric.js is the better fit for lightweight map-symbol creation than SVG-Edit because we can expose only the small tool surface needed for icons. Keep upload/source editing as fallback for complex SVGs.
 
-For tag editing, use an existing maintained React tag-input component rather
-than building a custom tag editor. During implementation, check current package
-health and choose a component that supports TypeScript or clean TypeScript
-wrapping, keyboard entry, tag removal, uniqueness, and accessible labels. Current
-candidates to evaluate include `react-tag-input-component`, `react-tag-input`,
-and `react-tag-autocomplete`. The implementation uses `react-tag-input-component`.
+For tag editing, use [`react-tag-input-component`](https://github.com/hc-oss/react-tag-input-component).
+It supports TypeScript, keyboard entry, tag removal, uniqueness enforcement, and
+accessible labels without requiring a hand-rolled tag editor.
 
-For complex features, a web search of external open source libraries should
-be checked and used before writing new code. [DOMPurify](https://github.com/cure53/dompurify)
-was the original candidate for SVG sanitation, but it requires a DOM (jsdom on
-the server), which leaks memory natively and is heavy for a Raspberry-Pi target.
-The implementation instead uses [`@xmldom/xmldom`](https://github.com/xmldom/xmldom)
+For SVG sanitization, use [`@xmldom/xmldom`](https://github.com/xmldom/xmldom)
 (pure JS) with a strict element/attribute allowlist — see *SVG Validation and
-Sanitization* and *Implementation Status and Deviations*.
+Sanitization*. Do not use DOMPurify; it requires jsdom, which leaks memory at
+the native/realm level and is too heavy for a Raspberry Pi target.
 
 ## SVG Validation and Sanitization
 
@@ -641,31 +561,47 @@ permits read-only access.
 
 Resource-provider `setResource` and `deleteResource` calls must remain read-only
 rejections even for authenticated users. Authentication can authorize the plugin
-manager API, but it must not turn the resources API into a second mutation path
-for this MVP.
+manager API, but it must not turn the resources API into a second mutation path.
+
+### Security Considerations
+
+SVG can contain executable or risky content. Both providers and consumers should
+be defensive.
+
+Providers must:
+
+- Sanitize all uploaded or editor-generated SVG before storage.
+- Reject scripts, event-handler attributes, `foreignObject`, and external references.
+- Enforce file size limits.
+- Serve assets with accurate `Content-Type: image/svg+xml`.
+
+Consumers should:
+
+- Validate media type before registration.
+- Avoid blindly injecting unsanitized SVG into the DOM.
+- Prefer safe image loading mechanisms (e.g. `<img src="...">` rather than
+  inline SVG injection) where practical.
+- Fall back gracefully when an asset fails to load.
 
 ## Chart and Vector Renderer Notes
 
-This plugin's first MVP targets SVG symbols for UI and map overlay markers.
+This plugin targets SVG symbols for UI and map overlay markers.
 
 MVT, Mapbox/MapLibre style sprites, and S-57/ENC native chart portrayal are
-renderer-specific. The plugin may eventually generate renderer-specific assets,
-but the first version must not claim to replace S-57/ENC chart-symbol catalogs.
-
-Native S-57/ENC custom portrayal belongs in a separate map-style or
-chart-portrayal implementation spec.
+renderer-specific and out of scope. Native S-57/ENC custom portrayal belongs in
+a separate map-style or chart-portrayal implementation.
 
 ## Non-Goals
 
 - Do not require a custom Signal K server build.
 - Do not implement consumer application changes in this plugin.
-- Do not implement native S-57/ENC portrayal in the first version.
+- Do not implement native S-57/ENC portrayal.
 - Do not store user-generated runtime data in git.
 - Do not require consumers to support every optional symbol asset format.
 
 ## Verification Goals
 
-When implementation begins, verification should include:
+Verification must include:
 
 - `GET /signalk/v2/api/resources/symbols` returns namespace-qualified symbol keys.
 - `GET /signalk/v2/api/resources/symbols/:resourceId` returns the requested symbol.
@@ -698,5 +634,5 @@ When implementation begins, verification should include:
 ## Assumptions And Defaults
 
 - Node requirement for the plugin is `>=22.5.0` because it uses `node:sqlite`.
-- The first version supports SVG only; no PNG sprite generation, MapLibre sprite metadata, or S-57/ENC portrayal changes.
+- Supports SVG only; no PNG sprite generation, MapLibre sprite metadata, or S-57/ENC portrayal.
 - Fabric.js visual editing may normalize complex uploaded SVGs. The plugin must preserve a source/upload path so users are not blocked when Fabric cannot round-trip an SVG cleanly.
