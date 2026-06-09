@@ -5,6 +5,12 @@
 import { TagsInput } from 'react-tag-input-component'
 import { AppConfig, SymbolMeta } from '../types'
 
+// Which groups of fields to render. The visual editor splits the panel:
+// `identity` (id/namespace/name/description/GPX) on the right next to the
+// preview, and `classification` (roles/tags/map-marker) under the canvas. The
+// upload form renders `all` in a single column.
+export type MetaSection = 'all' | 'identity' | 'classification'
+
 interface Props {
   meta: SymbolMeta
   onChange: (patch: Partial<SymbolMeta>) => void
@@ -12,14 +18,23 @@ interface Props {
   // True when editing an existing symbol. Id/namespace stay editable (changing
   // them renames the symbol), but we surface a hint so it isn't a surprise.
   editing: boolean
+  sections?: MetaSection
 }
 
 export function isMapMarker(roles: string[], config: AppConfig): boolean {
   return roles.some((r) => config.mapMarkerRoles.includes(r))
 }
 
-export function MetadataFields({ meta, onChange, config, editing }: Props) {
+export function MetadataFields({
+  meta,
+  onChange,
+  config,
+  editing,
+  sections = 'all'
+}: Props) {
   const mapMarker = isMapMarker(meta.roles, config)
+  const showIdentity = sections === 'all' || sections === 'identity'
+  const showClassification = sections === 'all' || sections === 'classification'
 
   const toggleRole = (role: string) => {
     const roles = meta.roles.includes(role)
@@ -30,121 +45,131 @@ export function MetadataFields({ meta, onChange, config, editing }: Props) {
 
   return (
     <div className="metadata-fields">
-      <label>
-        Id
-        <input
-          value={meta.id}
-          onChange={(e) => onChange({ id: e.target.value })}
-          placeholder="dive-site"
-        />
-      </label>
-      <label>
-        Namespace
-        <input
-          value={meta.namespace}
-          onChange={(e) => onChange({ namespace: e.target.value })}
-        />
-      </label>
-      {editing ? (
-        <p className="field-hint">
-          Changing the id or namespace renames this symbol (and the SVG file on
-          disk). Apps referencing the old id will need updating.
-        </p>
-      ) : null}
-      <label>
-        Name
-        <input
-          value={meta.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="Dive Site"
-        />
-      </label>
-      <label>
-        Description
-        <input
-          value={meta.description}
-          onChange={(e) => onChange({ description: e.target.value })}
-        />
-      </label>
+      {showIdentity ? (
+        <>
+          <label>
+            Id
+            <input
+              value={meta.id}
+              onChange={(e) => onChange({ id: e.target.value })}
+              placeholder="dive-site"
+            />
+          </label>
+          <label>
+            Namespace
+            <input
+              value={meta.namespace}
+              onChange={(e) => onChange({ namespace: e.target.value })}
+            />
+          </label>
+          {editing ? (
+            <p className="field-hint">
+              Changing the id or namespace renames this symbol (and the SVG file
+              on disk). Apps referencing the old id will need updating.
+            </p>
+          ) : null}
+          <label>
+            Name
+            <input
+              value={meta.name}
+              onChange={(e) => onChange({ name: e.target.value })}
+              placeholder="Dive Site"
+            />
+          </label>
+          <label>
+            Description
+            <input
+              value={meta.description}
+              onChange={(e) => onChange({ description: e.target.value })}
+            />
+          </label>
 
-      <fieldset>
-        <legend>Roles</legend>
-        <div className="roles">
-          {config.roles.map((role) => (
-            <label key={role} className="checkbox">
+          <fieldset>
+            <legend>GPX mapping (optional)</legend>
+            <label>
+              GPX Type
               <input
-                type="checkbox"
-                checked={meta.roles.includes(role)}
-                onChange={() => toggleRole(role)}
+                value={meta.gpxType}
+                onChange={(e) => onChange({ gpxType: e.target.value })}
+                placeholder="e.g. Dive Site"
               />
-              {role}
-              {config.mapMarkerRoles.includes(role) ? (
-                <span className="badge">chart</span>
-              ) : null}
             </label>
-          ))}
-        </div>
-      </fieldset>
+            <label>
+              GPX Sym
+              <input
+                value={meta.gpxSym}
+                onChange={(e) => onChange({ gpxSym: e.target.value })}
+                placeholder="e.g. Scuba Flag"
+              />
+            </label>
+          </fieldset>
+        </>
+      ) : null}
 
-      <div className="field">
-        <span className="field-label">Tags</span>
-        <TagsInput
-          value={meta.tags}
-          onChange={(tags) => onChange({ tags })}
-          name="tags"
-          placeHolder="add tag + Enter"
-        />
-      </div>
+      {showClassification ? (
+        <>
+          <fieldset>
+            <legend>Roles</legend>
+            <div className="roles">
+              {config.roles.map((role) => (
+                <label key={role} className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={meta.roles.includes(role)}
+                    onChange={() => toggleRole(role)}
+                  />
+                  {role}
+                  {config.mapMarkerRoles.includes(role) ? (
+                    <span className="badge">chart</span>
+                  ) : null}
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
-      <fieldset className={mapMarker ? 'required' : ''}>
-        <legend>Map-marker metadata {mapMarker ? '(required)' : '(optional)'}</legend>
-        <label>
-          Scale
-          <input
-            value={meta.scale}
-            onChange={(e) => onChange({ scale: e.target.value })}
-            placeholder="0.65"
-          />
-        </label>
-        <div className="anchor-fields">
-          <label>
-            Anchor X
-            <input
-              value={meta.anchorX}
-              onChange={(e) => onChange({ anchorX: e.target.value })}
-              placeholder="1"
+          <div className="field">
+            <span className="field-label">Tags</span>
+            <TagsInput
+              value={meta.tags}
+              onChange={(tags) => onChange({ tags })}
+              name="tags"
+              placeHolder="add tag + Enter"
             />
-          </label>
-          <label>
-            Anchor Y
-            <input
-              value={meta.anchorY}
-              onChange={(e) => onChange({ anchorY: e.target.value })}
-              placeholder="37"
-            />
-          </label>
-        </div>
-      </fieldset>
+          </div>
 
-      <fieldset>
-        <legend>GPX mapping (optional)</legend>
-        <label>
-          GPX Type
-          <input
-            value={meta.gpxType}
-            onChange={(e) => onChange({ gpxType: e.target.value })}
-            placeholder="e.g. Dive Site"
-          />
-        </label>
-        <label>
-          GPX Sym
-          <input
-            value={meta.gpxSym}
-            onChange={(e) => onChange({ gpxSym: e.target.value })}
-            placeholder="e.g. Scuba Flag"
-          />
-        </label>
-      </fieldset>
+          <fieldset className={mapMarker ? 'required' : ''}>
+            <legend>
+              Map-marker metadata {mapMarker ? '(required)' : '(optional)'}
+            </legend>
+            <label>
+              Scale
+              <input
+                value={meta.scale}
+                onChange={(e) => onChange({ scale: e.target.value })}
+                placeholder="0.65"
+              />
+            </label>
+            <div className="anchor-fields">
+              <label>
+                Anchor X
+                <input
+                  value={meta.anchorX}
+                  onChange={(e) => onChange({ anchorX: e.target.value })}
+                  placeholder="1"
+                />
+              </label>
+              <label>
+                Anchor Y
+                <input
+                  value={meta.anchorY}
+                  onChange={(e) => onChange({ anchorY: e.target.value })}
+                  placeholder="37"
+                />
+              </label>
+            </div>
+          </fieldset>
+        </>
+      ) : null}
     </div>
   )
 }

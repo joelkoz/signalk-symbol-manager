@@ -1003,115 +1003,138 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
 
       {error ? <div className="error">{error}</div> : null}
 
+      {/* Layout: in two-column mode the left column is the editor + Symbol
+          Properties (identity); the right column is the Preview + Roles/Tags/
+          Map-marker. In one-column mode the four blocks reflow to editor →
+          preview → symbol properties → roles/tags/map-marker (the columns go
+          `display: contents` and the blocks are ordered via CSS — see
+          styles.css). The `eb-*` classes are the ordering hooks. */}
       <div className="editor-body">
         <div className="editor-canvas-col">
-          <div className="tool-bar">
-            <button onClick={() => addShape('rect')} className="tip" aria-label="Add a rectangle">▭</button>
-            <button onClick={() => addShape('circle')} className="tip" aria-label="Add a circle">◯</button>
-            <button onClick={() => addShape('line')} className="tip" aria-label="Add a line">╱</button>
-            <button onClick={() => addShape('arrow')} className="tip" aria-label="Add an arrow">→</button>
-            <button onClick={() => addShape('text')} className="tip" aria-label="Add a text label">T</button>
-            <button
-              onClick={() => (drawing ? cancelPolygon() : beginPolygon())}
-              className={drawing ? 'tip active' : 'tip'}
-              aria-label="Draw a polygon / polyline: click each point; double-click to finish as a line, or click the start point to close the shape"
-            >
-              ⬠
-            </button>
-            <button onClick={onImportClick} className="tip" aria-label="Import an external SVG file as a shape">
-              Import
-            </button>
-            <span className="tool-sep" />
-            <button
-              onClick={() => void undo()}
-              disabled={!canUndo}
-              className="tip"
-              aria-label="Undo the last change (Cmd/Ctrl-Z)"
-            >
-              ↶ Undo
-            </button>
-            <span className="tool-sep" />
-            <label
-              className="zoom-slider tip"
-              aria-label="Zoom the editor view in/out — visual only; does not change the symbol"
-            >
-              Zoom
-              <input
-                type="range"
-                min={zoomMinPct}
-                max={zoomMaxPct}
-                step={50}
-                value={Math.min(zoomMaxPct, Math.max(zoomMinPct, zoomCurPct))}
-                onChange={(e) => setZoom(Number(e.target.value) / 100 / fz)}
-              />
-              <span className="zoom-label">{zoomCurPct}%</span>
-            </label>
-          </div>
-          <div className="canvas-frame">
-            <canvas ref={canvasElRef} width={VIEW_W} height={VIEW_H} />
-            {scroll.showX && (
-              <div className="scroll-bar scroll-bar-x">
-                <div
-                  className="scroll-thumb"
-                  style={{
-                    width: `${scroll.tw * 100}%`,
-                    left: `${scroll.x * (1 - scroll.tw) * 100}%`
-                  }}
-                  onMouseDown={(e) => startScrollDrag('x', e)}
-                />
-              </div>
-            )}
-            {scroll.showY && (
-              <div className="scroll-bar scroll-bar-y">
-                <div
-                  className="scroll-thumb"
-                  style={{
-                    height: `${scroll.th * 100}%`,
-                    top: `${scroll.y * (1 - scroll.th) * 100}%`
-                  }}
-                  onMouseDown={(e) => startScrollDrag('y', e)}
-                />
-              </div>
-            )}
-          </div>
-          <div className="editor-hint">
-            {drawing ? (
-              <strong>
-                Polygon: click each point. Double-click to finish as a line, or
-                click the start point to close the shape. Esc cancels.
-              </strong>
-            ) : (
-              <>
-                Click a shape to select; click again to cycle through overlapping
-                shapes. Drag the blue ⊕ to set the anchor point.{' '}
-                <strong>Shift+drag</strong> to pan when zoomed in.
-              </>
-            )}
-          </div>
-          <button
-            className="link tip"
-            onClick={showSource ? () => setShowSource(false) : openSource}
-            aria-label="View or edit the raw SVG markup (sanitized when applied)"
-          >
-            {showSource ? 'Hide' : 'View / edit'} SVG source
-          </button>
-          {showSource ? (
-            <div className="source-edit">
-              <textarea
-                value={sourceText}
-                onChange={(e) => setSourceText(e.target.value)}
-                spellCheck={false}
-                rows={10}
-              />
-              <button onClick={applySource} disabled={busy}>
-                Sanitize &amp; apply to canvas
+          <div className="eb-editor">
+            <div className="tool-bar">
+              <button onClick={() => addShape('rect')} className="tip" aria-label="Add a rectangle">▭</button>
+              <button onClick={() => addShape('circle')} className="tip" aria-label="Add a circle">◯</button>
+              <button onClick={() => addShape('line')} className="tip" aria-label="Add a line">╱</button>
+              <button onClick={() => addShape('arrow')} className="tip" aria-label="Add an arrow">→</button>
+              <button onClick={() => addShape('text')} className="tip" aria-label="Add a text label">T</button>
+              <button
+                onClick={() => (drawing ? cancelPolygon() : beginPolygon())}
+                className={drawing ? 'tip active' : 'tip'}
+                aria-label="Draw a polygon / polyline: click each point; double-click to finish as a line, or click the start point to close the shape"
+              >
+                ⬠
               </button>
+              <button onClick={onImportClick} className="tip" aria-label="Import an external SVG file as a shape">
+                Import
+              </button>
+              <span className="tool-sep" />
+              <button
+                onClick={() => void undo()}
+                disabled={!canUndo}
+                className="tip"
+                aria-label="Undo the last change (Cmd/Ctrl-Z)"
+              >
+                ↶ Undo
+              </button>
+              <span className="tool-sep" />
+              <label
+                className="zoom-slider tip"
+                aria-label="Zoom the editor view in/out — visual only; does not change the symbol"
+              >
+                Zoom
+                <input
+                  type="range"
+                  min={zoomMinPct}
+                  max={zoomMaxPct}
+                  step={50}
+                  value={Math.min(zoomMaxPct, Math.max(zoomMinPct, zoomCurPct))}
+                  onChange={(e) => setZoom(Number(e.target.value) / 100 / fz)}
+                />
+                <span className="zoom-label">{zoomCurPct}%</span>
+              </label>
+            </div>
+            <div className="canvas-frame">
+              <canvas ref={canvasElRef} width={VIEW_W} height={VIEW_H} />
+              {scroll.showX && (
+                <div className="scroll-bar scroll-bar-x">
+                  <div
+                    className="scroll-thumb"
+                    style={{
+                      width: `${scroll.tw * 100}%`,
+                      left: `${scroll.x * (1 - scroll.tw) * 100}%`
+                    }}
+                    onMouseDown={(e) => startScrollDrag('x', e)}
+                  />
+                </div>
+              )}
+              {scroll.showY && (
+                <div className="scroll-bar scroll-bar-y">
+                  <div
+                    className="scroll-thumb"
+                    style={{
+                      height: `${scroll.th * 100}%`,
+                      top: `${scroll.y * (1 - scroll.th) * 100}%`
+                    }}
+                    onMouseDown={(e) => startScrollDrag('y', e)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="editor-hint">
+              {drawing ? (
+                <strong>
+                  Polygon: click each point. Double-click to finish as a line, or
+                  click the start point to close the shape. Esc cancels.
+                </strong>
+              ) : (
+                <>
+                  Click a shape to select; click again to cycle through overlapping
+                  shapes. Drag the blue ⊕ to set the anchor point.{' '}
+                  <strong>Shift+drag</strong> to pan when zoomed in.
+                </>
+              )}
+            </div>
+            <button
+              className="link tip"
+              onClick={showSource ? () => setShowSource(false) : openSource}
+              aria-label="View or edit the raw SVG markup (sanitized when applied)"
+            >
+              {showSource ? 'Hide' : 'View / edit'} SVG source
+            </button>
+            {showSource ? (
+              <div className="source-edit">
+                <textarea
+                  value={sourceText}
+                  onChange={(e) => setSourceText(e.target.value)}
+                  spellCheck={false}
+                  rows={10}
+                />
+                <button onClick={applySource} disabled={busy}>
+                  Sanitize &amp; apply to canvas
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Symbol Properties (id/namespace/name/description/GPX) sit directly
+              under the editor. Hidden while a shape is selected. */}
+          {!selected ? (
+            <div className="props-block eb-symbol-props">
+              <h3>Symbol properties</h3>
+              <MetadataFields
+                meta={meta}
+                onChange={updateMeta}
+                config={config}
+                editing={draft.mode === 'edit'}
+                sections="identity"
+              />
             </div>
           ) : null}
         </div>
 
         <div className="editor-props">
-          <div className="preview-block">
+          <div className="preview-block eb-preview">
             <h3>Preview</h3>
             <Preview
               svgText={previewSvg}
@@ -1122,7 +1145,9 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
             />
           </div>
 
-          <div className="props-block">
+          {/* Under the preview: the selected shape's properties, or — with
+              nothing selected — the Roles/Tags/Map-marker metadata. */}
+          <div className="props-block eb-side-props">
             {selected ? (
               <>
                 <h3>Shape</h3>
@@ -1138,12 +1163,13 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
               </>
             ) : (
               <>
-                <h3>Symbol properties</h3>
+                <h3>Roles, tags &amp; map-marker</h3>
                 <MetadataFields
                   meta={meta}
                   onChange={updateMeta}
                   config={config}
                   editing={draft.mode === 'edit'}
+                  sections="classification"
                 />
               </>
             )}

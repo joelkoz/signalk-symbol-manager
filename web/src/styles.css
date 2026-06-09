@@ -258,8 +258,38 @@ button.link {
   align-items: start;
 }
 @media (max-width: 860px) {
+  /* One column: flatten the two column wrappers (display: contents) so the four
+     blocks become direct flex items of .editor-body, then order them
+     editor → preview → symbol properties → roles/tags/map-marker. This order
+     differs from the natural two-column collapse, hence the explicit ordering. */
   .editor-body {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .editor-canvas-col,
+  .editor-props {
+    display: contents;
+  }
+  .eb-editor {
+    order: 1;
+  }
+  .eb-preview {
+    order: 2;
+  }
+  .eb-symbol-props {
+    order: 3;
+  }
+  .eb-side-props {
+    order: 4;
+  }
+  /* The flex gap already separates the blocks; drop the props-block top margin
+     so spacing stays uniform (the divider border is kept). Targeted by class —
+     display: contents leaves DOM ancestry unchanged, so a child combinator off
+     .editor-body would not match these. */
+  .eb-symbol-props,
+  .eb-side-props {
+    margin-top: 0;
   }
 }
 .editor-props label,
@@ -391,6 +421,13 @@ legend {
 
 /* --- fabric editor --- */
 .editor-canvas-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* The editor proper (toolbar + canvas + hint + source). Grouped so it stays one
+   unit when the layout flattens to a single column (see the 860px media query). */
+.eb-editor {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -583,10 +620,8 @@ legend {
   display: flex;
   gap: 6px;
 }
-/* Editor right column: Preview on top, properties beneath, separated by a
-   subtle divider. In single-column responsive mode the right column drops
-   below the canvas column, so this puts the Preview directly under the main
-   editor — matching the rule in the wide layout. */
+/* A metadata section (Symbol Properties, or the shape/roles panel) offset from
+   the block above it by a subtle top divider. Used in both columns. */
 .props-block {
   margin-top: 16px;
   border-top: 1px solid var(--border);
