@@ -1,12 +1,17 @@
+/* Palette tuned to match the Signal K admin UI (Bootstrap 5 + CoreUI):
+   primary #003399, body #e4e5e6, white cards, CoreUI border #c8ced3, 14px base.
+   Re-skin only — markup/structure is unchanged. */
 :root {
-  --bg: #f4f6f8;
+  --bg: #e4e5e6;
   --panel: #ffffff;
-  --border: #d6dbe0;
-  --text: #1d2733;
-  --muted: #69757f;
-  --primary: #1f6feb;
-  --danger: #d7322a;
-  --chip: #eef2f6;
+  --border: #c8ced3;
+  --text: #23282c;
+  --muted: #6c757d;
+  --primary: #003399;
+  --primary-hover: #002b82;
+  --focus-ring: rgba(0, 51, 153, 0.25);
+  --danger: #f86c6b;
+  --chip: #ebedef;
 }
 
 * {
@@ -17,6 +22,8 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
+  /* Bootstrap/CoreUI base font size (admin UI uses 0.875rem). */
+  font-size: 0.875rem;
   color: var(--text);
   background: var(--bg);
 }
@@ -36,7 +43,7 @@ button {
   cursor: pointer;
 }
 button:hover:not(:disabled) {
-  border-color: #b6bfc8;
+  border-color: #a5acb2;
 }
 button:disabled {
   opacity: 0.55;
@@ -47,9 +54,26 @@ button.primary {
   border-color: var(--primary);
   color: #fff;
 }
+button.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
 button.danger {
   color: var(--danger);
-  border-color: #e7b6b2;
+  border-color: #f3b6b5;
+}
+
+/* Bootstrap-style focus ring on form controls and buttons. */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #668cff;
+  box-shadow: 0 0 0 0.2rem var(--focus-ring);
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem var(--focus-ring);
 }
 button.link {
   border: none;
@@ -63,10 +87,11 @@ button.link {
   flex: 1;
 }
 
+/* Bootstrap alert-danger / alert-warning palettes (matches the admin UI). */
 .error {
-  background: #fdecea;
-  border: 1px solid #f3c4bf;
-  color: #8a231d;
+  background: #f8d7da;
+  border: 1px solid #f5c2c7;
+  color: #842029;
   padding: 8px 12px;
   border-radius: 6px;
 }
@@ -77,9 +102,9 @@ button.link {
   margin-bottom: 12px;
 }
 .error.auth {
-  background: #fff6e5;
-  border-color: #f0d39a;
-  color: #7a5600;
+  background: #fff3cd;
+  border-color: #ffecb5;
+  color: #664d03;
 }
 
 /* --- list view --- */
@@ -345,7 +370,7 @@ legend {
 }
 .badge {
   font-size: 10px;
-  background: #e6f0ff;
+  background: #e0e6f3;
   color: var(--primary);
   border-radius: 8px;
   padding: 0 6px;
@@ -397,8 +422,8 @@ legend {
   margin-left: -6px;
   margin-top: -6px;
   border-radius: 50%;
-  border: 2px solid #1f6feb;
-  background: rgba(31, 111, 235, 0.25);
+  border: 2px solid var(--primary);
+  background: var(--focus-ring);
   box-shadow: 0 0 0 1px #fff;
   pointer-events: none;
 }
