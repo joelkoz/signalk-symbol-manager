@@ -640,6 +640,16 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
         marker.setCoords()
         fc.add(marker)
         anchorRef.current = marker
+        // The marker is always drawn (defaulting to centre when the symbol has
+        // no stored anchor). Reflect that position into the metadata right away
+        // so the anchor is "set" to what the user sees — otherwise a symbol that
+        // later gains a map-marker role fails the save-time anchor check until
+        // the marker is nudged.
+        setMeta((m) => ({
+          ...m,
+          anchorX: m.anchorX === '' ? String(round(ax)) : m.anchorX,
+          anchorY: m.anchorY === '' ? String(round(ay)) : m.anchorY
+        }))
         applyView(1)
         setReady(true)
         refreshPreview()

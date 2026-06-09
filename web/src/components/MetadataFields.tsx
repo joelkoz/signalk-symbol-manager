@@ -209,8 +209,8 @@ export function buildPayload(
     tags: meta.tags,
     scale,
     anchor,
-    gpxType: meta.gpxType.trim(),
-    gpxSym: meta.gpxSym.trim(),
+    gpxType: (meta.gpxType ?? '').trim(),
+    gpxSym: (meta.gpxSym ?? '').trim(),
     svg
   }
 }

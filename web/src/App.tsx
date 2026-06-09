@@ -132,8 +132,10 @@ export function App() {
         tags: s.tags,
         scale: s.scale != null ? String(s.scale) : '',
         anchor: anchorStr(s.anchor),
-        gpxType: s.gpxType,
-        gpxSym: s.gpxSym,
+        // Default to '' so a symbol from an older server build (no GPX fields)
+        // doesn't yield undefined and crash the save-time trim().
+        gpxType: s.gpxType ?? '',
+        gpxSym: s.gpxSym ?? '',
         svg: svgText,
         width: s.width,
         height: s.height
@@ -155,9 +157,16 @@ export function App() {
     setDupError(null)
     setDupBusy(true)
     try {
-      await api.duplicate(duplicating.key, newId, newNamespace || undefined)
+      const created = await api.duplicate(
+        duplicating.key,
+        newId,
+        newNamespace || undefined
+      )
       setDuplicating(null)
+      // Refresh so a later Cancel returns to a list that includes the copy,
+      // then open the editor directly on the new symbol.
       await refresh()
+      await onEdit(created)
     } catch (e) {
       setDupError((e as Error).message)
     } finally {
