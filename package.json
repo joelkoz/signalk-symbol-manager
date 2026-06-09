@@ -32,7 +32,7 @@
     "screenshots": [
       "./docs/screenshots/1_symbol-manager.png",
       "./docs/screenshots/2_symbol-manager.png",
-      "./docs/screenshots/3_symbol-manager.png",
+      "./docs/screenshots/3_symbol-manager.png"
     ],
     "appstore": {
       "displayName": "Chart Symbol Manager",
@@ -46,7 +46,7 @@
     "webapp": {
       "name": "Chart Symbol Manager",
       "description": "Chart marker SVG editor with symbol provider",
-      "location": "/plugins/signalk-symbol-provider/"
+      "location": "/signalk-symbol-manager/"
     }
   },
   "files": [
@@ -54,6 +54,7 @@
     "public",
     "templates",
     "assets",
+    "docs/screenshots",
     "README.md",
     "REQUIREMENTS.md",
     "AGENTS.md",
