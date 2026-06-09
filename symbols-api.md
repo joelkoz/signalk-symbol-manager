@@ -4,30 +4,22 @@ title: Symbols API
 
 # Working with the Symbols API
 
-#### (Proposed)
-
-_Note: This API is proposed and subject to change. It is implemented today via the custom resource provider mechanism — no Signal K server changes are required to use it._
-
-Signal K applications often need a shared vocabulary of visual symbols. Today
-each application may ship its own fixed icon set, and users who need
-domain-specific symbols must fork the client or request that icons be bundled
-upstream.
+Signal K applications often need a shared vocabulary of visual symbols. Each
+application may ship its own fixed icon set, and users who need domain-specific
+symbols must fork the client or request that icons be bundled upstream.
 
 The **Symbols API** defines a Signal K resource type — `symbols` — that any
-plugin can provide via the existing Resource Provider API. Consumer applications
-such as chartplotters, logbooks, dashboards, route planners, note editors, and
-alert panels can discover and render the provided symbols without being tied to
-a specific plugin.
+plugin can provide via the [Resource Provider API](../resources_api.md).
+Consumer applications such as chartplotters, logbooks, dashboards, route
+planners, note editors, and alert panels can discover and render the provided
+symbols without being tied to a specific plugin.
 
-Because the Signal K server already supports custom resource provider types, a
-plugin can register for `symbols` today and the collection is immediately
-accessible at:
+`symbols` is a user-defined resource type hosted under the `resources` path, so
+the collection is accessible at:
 
-```
+```text
 /signalk/v2/api/resources/symbols
 ```
-
-No server code changes are needed for the first implementation.
 
 ---
 
@@ -40,13 +32,13 @@ Each symbol has two identity fields:
 
 The canonical consumer reference combines them:
 
-```
+```text
 <namespace>:<id>
 ```
 
 Examples:
 
-```
+```text
 user:dive-site
 mycustom:dive-site
 ```
@@ -77,13 +69,13 @@ resolution.
 
 ### List all symbols
 
-```
-GET /signalk/v2/api/resources/symbols
+```typescript
+HTTP GET "/signalk/v2/api/resources/symbols"
 ```
 
 Returns an object keyed by canonical `namespace:id`:
 
-```json
+```JSON
 {
   "user:dive-site": {
     "id": "dive-site",
@@ -121,15 +113,15 @@ Returns an object keyed by canonical `namespace:id`:
 
 By canonical `namespace:id`:
 
-```
-GET /signalk/v2/api/resources/symbols/user:dive-site
+```typescript
+HTTP GET "/signalk/v2/api/resources/symbols/user:dive-site"
 ```
 
 By unqualified local id (succeeds only when exactly one symbol with that id
-exists across all namespaces — see *Symbol Resolution* below):
+exists across all namespaces — see _Symbol Resolution_ below):
 
-```
-GET /signalk/v2/api/resources/symbols/dive-site
+```typescript
+HTTP GET "/signalk/v2/api/resources/symbols/dive-site"
 ```
 
 ---
@@ -138,22 +130,22 @@ GET /signalk/v2/api/resources/symbols/dive-site
 
 Each symbol entry in the collection contains:
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `id` | ✓ | Local symbol id, e.g. `dive-site` |
-| `namespace` | ✓ | Symbol namespace, e.g. `user` |
-| `name` | ✓ | Human-readable name |
-| `mediaType` | ✓ | Asset media type — `image/svg+xml` for this implementation |
-| `url` | ✓ | URL of the primary symbol asset |
-| `$source` | ✓ | Provider plugin id (Signal K resource response metadata) |
-| `timestamp` | ✓ | ISO 8601 last-modified timestamp (resource response metadata) |
-| `description` | | Human-readable description |
-| `roles` | | Intended usage categories (see *Roles* below) |
-| `tags` | | Free-form search/filter keywords |
-| `scale` | | Recommended OpenLayers icon scale for map-marker rendering |
-| `anchor` | | Recommended anchor point `[x, y]` in pixels from the top-left of the SVG |
-| `gpxType` | | Mapping to a GPX waypoint `<type>` value (see *GPX mapping* below) |
-| `gpxSym` | | Mapping to a GPX waypoint `<sym>` value (see *GPX mapping* below) |
+| Field         | Required | Description                                                              |
+| ------------- | -------- | ------------------------------------------------------------------------ |
+| `id`          | ✓        | Local symbol id, e.g. `dive-site`                                        |
+| `namespace`   | ✓        | Symbol namespace, e.g. `user`                                            |
+| `name`        | ✓        | Human-readable name                                                      |
+| `mediaType`   | ✓        | Asset media type — `image/svg+xml`                                       |
+| `url`         | ✓        | URL of the primary symbol asset                                          |
+| `$source`     | ✓        | Provider plugin id (Signal K resource response metadata)                 |
+| `timestamp`   | ✓        | ISO 8601 last-modified timestamp (resource response metadata)            |
+| `description` |          | Human-readable description                                               |
+| `roles`       |          | Intended usage categories (see _Roles_ below)                            |
+| `tags`        |          | Free-form search/filter keywords                                         |
+| `scale`       |          | Recommended OpenLayers icon scale for map-marker rendering               |
+| `anchor`      |          | Recommended anchor point `[x, y]` in pixels from the top-left of the SVG |
+| `gpxType`     |          | Mapping to a GPX waypoint `<type>` value (see _GPX mapping_ below)       |
+| `gpxSym`      |          | Mapping to a GPX waypoint `<sym>` value (see _GPX mapping_ below)        |
 
 The object key in the collection must equal `` `${namespace}:${id}` ``.
 
@@ -161,16 +153,16 @@ The object key in the collection must equal `` `${namespace}:${id}` ``.
 
 The `roles` array uses an advisory vocabulary. Known values:
 
-| Role | Meaning |
-|------|---------|
-| `note` | Used as a chart note / annotation marker |
-| `waypoint` | Used as a navigation waypoint |
-| `map-marker` | Displayed at a specific position on a chart |
-| `region` | Associated with a geographic region |
-| `button` | Used as a UI button icon |
-| `alert` | Used in alert or alarm contexts |
-| `logbook` | Used in logbook entries |
-| `vector-style-icon` | Used as an icon in a vector map style |
+| Role                | Meaning                                     |
+| ------------------- | ------------------------------------------- |
+| `note`              | Used as a chart note / annotation marker    |
+| `waypoint`          | Used as a navigation waypoint               |
+| `map-marker`        | Displayed at a specific position on a chart |
+| `region`            | Associated with a geographic region         |
+| `button`            | Used as a UI button icon                    |
+| `alert`             | Used in alert or alarm contexts             |
+| `logbook`           | Used in logbook entries                     |
+| `vector-style-icon` | Used as an icon in a vector map style       |
 
 Consumers should ignore unknown role values. A symbol may have multiple roles.
 
@@ -180,7 +172,7 @@ For symbols intended as chart markers (`note`, `waypoint`, `map-marker` roles),
 providers should supply `scale` and `anchor`. When present, these follow the
 OpenLayers `Icon` style convention:
 
-```
+```text
 displayed width  = SVG width  × scale
 displayed height = SVG height × scale
 anchor position  = [anchorX, anchorY] in source pixels from the SVG top-left
@@ -206,7 +198,7 @@ the consumer. Providers should emit these fields only when they carry a value.
 
 ### Deferred fields
 
-The following fields are intentionally omitted from this first version:
+The following fields are intentionally omitted from this specification:
 
 - `variants` — alternate light/dark/selected/alert assets.
 - `assets` — renderer-specific assets such as PNG fallbacks or sprite entries.
@@ -229,7 +221,7 @@ Resolution order:
 3. If none found, display a fallback symbol.
 
 If more than one external provider defines the same local id, the result is
-ambiguous and the provider should reject the lookup with an error. Consumers
+ambiguous and consumers may choose their own method of resolving. Consumers
 should store qualified references (`namespace:id`) to avoid this ambiguity.
 
 ### Qualified reference — `mycustom:dive-site`
@@ -251,13 +243,13 @@ A symbol-aware consumer can interpret existing fields such as
 
 Preferred reference form (string):
 
-```
+```text
 user:dive-site
 ```
 
 Object form (optional equivalent):
 
-```json
+```JSON
 { "namespace": "user", "id": "dive-site" }
 ```
 
@@ -280,10 +272,10 @@ A plugin registers as a symbol provider using the existing Resource Provider API
 app.registerResourceProvider({
   type: 'symbols',
   methods: {
-    listResources,   // return all symbols keyed by namespace:id
-    getResource,     // return one symbol by canonical or unqualified id
-    setResource,     // may reject for read-only providers
-    deleteResource   // may reject for read-only providers
+    listResources, // return all symbols keyed by namespace:id
+    getResource, // return one symbol by canonical or unqualified id
+    setResource, // may reject for read-only providers
+    deleteResource // may reject for read-only providers
   }
 })
 ```
@@ -353,7 +345,7 @@ be defensive.
 - This does not define a full cartographic portrayal system.
 - This does not replace S-57/ENC symbol catalogs.
 - Mapbox/MapLibre sprite metadata, PNG sprite generation, and S-57/ENC native
-  portrayal are out of scope for this first version.
+  portrayal are out of scope.
 
 ---
 
