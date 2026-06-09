@@ -98,8 +98,8 @@ Returns an object keyed by canonical `namespace:id`:
     "tags": ["diving"],
     "scale": 0.65,
     "anchor": [1, 37],
-    "gpxType": "Dive Site",
-    "gpxSym": "Scuba Flag"
+    "gpxType": "Waypoint",
+    "gpxSym": "Diver Down Flag 1"
   },
   "user:anchorage": {
     "id": "anchorage",
