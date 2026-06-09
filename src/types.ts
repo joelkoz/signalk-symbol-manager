@@ -39,6 +39,9 @@ export interface SymbolDefinition {
   tags?: string[]
   scale?: number
   anchor?: Anchor
+  // Free-form mappings to GPX `<type>` and `<sym>` for waypoint import/export.
+  gpxType?: string
+  gpxSym?: string
 }
 
 export interface SymbolResource extends SymbolDefinition {
@@ -58,6 +61,9 @@ export interface SymbolRecord {
   tags: string[]
   scale: number | null
   anchor: Anchor | null
+  // Free-form mappings to GPX `<type>` and `<sym>` for waypoint import/export.
+  gpxType: string
+  gpxSym: string
   // Nominal source dimensions (px), from the SVG width/height or viewBox. Used
   // by consumers/previews to compute Freeboard display size = width * scale.
   width: number | null
@@ -77,6 +83,8 @@ export interface SymbolInput {
   tags?: string[]
   scale?: number | null
   anchor?: Anchor | null
+  gpxType?: string
+  gpxSym?: string
   svg?: string
 }
 

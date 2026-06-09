@@ -51,7 +51,9 @@ function draftToMeta(draft: SymbolDraft): SymbolMeta {
     tags: draft.tags,
     scale: draft.scale,
     anchorX: draft.anchor.x,
-    anchorY: draft.anchor.y
+    anchorY: draft.anchor.y,
+    gpxType: draft.gpxType,
+    gpxSym: draft.gpxSym
   }
 }
 

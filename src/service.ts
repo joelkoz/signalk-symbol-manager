@@ -99,6 +99,8 @@ export class SymbolService {
     if (record.tags.length) def.tags = record.tags
     if (record.scale !== null) def.scale = record.scale
     if (record.anchor !== null) def.anchor = record.anchor
+    if (record.gpxType) def.gpxType = record.gpxType
+    if (record.gpxSym) def.gpxSym = record.gpxSym
     return def
   }
 
@@ -192,6 +194,8 @@ export class SymbolService {
       tags,
       scale,
       anchor,
+      gpxType: typeof input.gpxType === 'string' ? input.gpxType.trim() : '',
+      gpxSym: typeof input.gpxSym === 'string' ? input.gpxSym.trim() : '',
       svg,
       width,
       height
@@ -213,6 +217,8 @@ export class SymbolService {
       tags: meta.tags,
       scale: meta.scale,
       anchor: meta.anchor,
+      gpxType: meta.gpxType,
+      gpxSym: meta.gpxSym,
       width: meta.width,
       height: meta.height,
       svg: meta.svg!
@@ -244,6 +250,8 @@ export class SymbolService {
       tags: meta.tags,
       scale: meta.scale,
       anchor: meta.anchor,
+      gpxType: meta.gpxType,
+      gpxSym: meta.gpxSym,
       svg: meta.svg,
       width: meta.width,
       height: meta.height
@@ -275,6 +283,8 @@ export class SymbolService {
       tags: source.tags,
       scale: source.scale,
       anchor: source.anchor,
+      gpxType: source.gpxType,
+      gpxSym: source.gpxSym,
       width: source.width,
       height: source.height,
       svg

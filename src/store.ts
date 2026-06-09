@@ -28,6 +28,8 @@ interface Row {
   scale: number | null
   anchorX: number | null
   anchorY: number | null
+  gpxType: string
+  gpxSym: string
   width: number | null
   height: number | null
   svgFile: string
@@ -44,6 +46,8 @@ export interface NewSymbol {
   tags: string[]
   scale: number | null
   anchor: Anchor | null
+  gpxType: string
+  gpxSym: string
   width: number | null
   height: number | null
   svg: string
@@ -63,6 +67,8 @@ function rowToRecord(row: Row): SymbolRecord {
       row.anchorX === null || row.anchorY === null
         ? null
         : [row.anchorX, row.anchorY],
+    gpxType: row.gpxType ?? '',
+    gpxSym: row.gpxSym ?? '',
     width: row.width,
     height: row.height,
     svgFile: row.svgFile,
@@ -93,6 +99,8 @@ export class SymbolStore {
         scale       REAL,
         anchorX     REAL,
         anchorY     REAL,
+        gpxType     TEXT NOT NULL DEFAULT '',
+        gpxSym      TEXT NOT NULL DEFAULT '',
         width       REAL,
         height      REAL,
         svgFile     TEXT NOT NULL,
@@ -195,8 +203,8 @@ export class SymbolStore {
     this.db
       .prepare(
         `INSERT INTO symbols
-          (namespace, id, name, description, mediaType, roles, tags, scale, anchorX, anchorY, width, height, svgFile, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 'image/svg+xml', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (namespace, id, name, description, mediaType, roles, tags, scale, anchorX, anchorY, gpxType, gpxSym, width, height, svgFile, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 'image/svg+xml', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         input.namespace,
@@ -208,6 +216,8 @@ export class SymbolStore {
         input.scale,
         input.anchor ? input.anchor[0] : null,
         input.anchor ? input.anchor[1] : null,
+        input.gpxType,
+        input.gpxSym,
         input.width,
         input.height,
         svgFile,
@@ -230,6 +240,8 @@ export class SymbolStore {
       tags: string[]
       scale: number | null
       anchor: Anchor | null
+      gpxType: string
+      gpxSym: string
       svg?: string
       width?: number | null
       height?: number | null
@@ -252,7 +264,7 @@ export class SymbolStore {
     this.db
       .prepare(
         `UPDATE symbols
-            SET name = ?, description = ?, roles = ?, tags = ?, scale = ?, anchorX = ?, anchorY = ?, width = ?, height = ?, updatedAt = ?
+            SET name = ?, description = ?, roles = ?, tags = ?, scale = ?, anchorX = ?, anchorY = ?, gpxType = ?, gpxSym = ?, width = ?, height = ?, updatedAt = ?
           WHERE namespace = ? AND id = ?`
       )
       .run(
@@ -263,6 +275,8 @@ export class SymbolStore {
         patch.scale,
         patch.anchor ? patch.anchor[0] : null,
         patch.anchor ? patch.anchor[1] : null,
+        patch.gpxType,
+        patch.gpxSym,
         width,
         height,
         now,

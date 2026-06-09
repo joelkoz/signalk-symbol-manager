@@ -4,30 +4,41 @@ Working notes for agents. Read alongside `README.md` and `REQUIREMENTS.md`.
 
 ## Status
 
-- **Phase 1 (core) — DONE and verified end-to-end against a local Signal K
-  server.** Resource provider, manager API, SQLite storage, SVG sanitization,
-  public asset serving, the 4 templates, and the React list-manager UI
-  (new-from-template, metadata edit, upload, duplicate, delete,
-  Freeboard-size preview) are implemented and working.
-- **Phase 2 (rich Fabric.js visual editor) — IMPLEMENTED.** `FabricEditor.tsx`
-  (used for New/Edit; upload still uses the simpler `SymbolForm`). Provides:
-  canvas SVG load, draggable anchor-point overlay (editor-only,
-  `excludeFromExport`), shape tools (rect/circle/line/arrow/text), contextual
-  shape properties (X/Y/W/H, fill/outline/outline-width, reorder, delete,
-  POI body-fit), z-order click-cycling (on click-without-drag), import-shape
-  (sanitized → grouped), zoom/fit, raw-SVG view/edit, and export→sanitize→save.
-  Shared metadata moved to `MetadataFields.tsx`.
-  - **Gotcha:** the app is NOT wrapped in `<React.StrictMode>` (see `main.tsx`).
-    StrictMode's dev double-invoke mounts/disposes the Fabric canvas twice and
-    corrupts it (edits silently dropped on export). Production React never
-    double-invokes, so this was dev-only, but StrictMode is removed so dev==prod.
-  - W/H edits scale by desired/current *scaled* size (stroke-inclusive), not
-    `W/width`, so they're exact.
-  - Verified in-browser: SVG load, anchor render, add-shape, contextual props,
-    exact W/H edit, anchor-field sync, live 1× preview (no anchor marker), and
-    the full save round-trip (persisted SVG contains editor-added shapes).
-    Lighter-verified (implemented, not click-simulated): canvas click-to-select,
-    z-cycle, anchor drag, import-shape, color edits.
+Core and the visual editor are both implemented and verified end-to-end against
+a local Signal K server.
+
+- **Backend.** Read-only `symbols` resource provider, manager CRUD API, SQLite
+  storage, SVG sanitization, public asset serving, and the 4 starter templates.
+- **List-manager UI.** New-from-template, edit, upload, duplicate, delete, and a
+  Freeboard-size preview.
+- **Visual editor** (`FabricEditor.tsx`, used for New/Edit; upload uses the
+  simpler `SymbolForm.tsx`). Canvas SVG load, draggable anchor-point overlay
+  (editor-only, `excludeFromExport`), shape tools (rect/circle/line/arrow/text/
+  polygon-polyline), contextual shape properties (X/Y/W/H, fill/outline/
+  outline-width, opacity, reorder, delete, POI body-fit), z-order click-cycling
+  (on click-without-drag), import-shape (sanitized → grouped), zoom + pan
+  (shift-drag / wheel) / fit, undo (Cmd/Ctrl-Z), raw-SVG view/edit, and
+  export→sanitize→save. Shared metadata lives in `MetadataFields.tsx`.
+- **Editable identity.** `id` and `namespace` are editable when editing an
+  existing symbol; a save that changes either triggers a backend **rename**
+  (`store.rename`) that moves the SVG asset on disk and rewrites the SQLite
+  primary key. Duplicate uses a two-field dialog (`DuplicateDialog.tsx`, id +
+  namespace) so the same id can be reused under a different namespace.
+- **GPX mapping.** Each symbol carries optional free-form `gpxType` / `gpxSym`
+  strings (map to a GPX waypoint `<type>` / `<sym>`). Stored in SQLite, edited
+  in the "GPX mapping" fieldset of `MetadataFields.tsx`, and emitted on the
+  public resource shape only when non-empty (same treatment as `description`).
+  Per user decision they ARE part of the public `symbols` API and are documented
+  in `symbols-api.md`.
+
+Editor gotchas:
+
+- The app is NOT wrapped in `<React.StrictMode>` (see `main.tsx`). StrictMode's
+  dev double-invoke mounts/disposes the Fabric canvas twice and corrupts it
+  (edits silently dropped on export). Production React never double-invokes, so
+  this was dev-only, but StrictMode is removed so dev==prod.
+- W/H edits scale by desired/current *scaled* size (stroke-inclusive), not
+  `W/width`, so they're exact.
 
 ## Key decisions
 
@@ -35,14 +46,18 @@ Working notes for agents. Read alongside `README.md` and `REQUIREMENTS.md`.
   behind *admin* auth and ignores `allow_readonly`, so a `/plugins/...svg` asset
   would not be loadable by read-only consumers. Assets are served at
   `/signalk/symbol-manager/symbols/:ref.svg` (registered on the app, like
-  chart-tile plugins) and that is the `url` in every resource. This is a
-  deliberate divergence from the literal route in `REQUIREMENTS.md`; the user
-  approved it.
+  chart-tile plugins) and that is the `url` in every resource. This is now the
+  documented requirement in `REQUIREMENTS.md` (it began as a divergence from an
+  earlier draft route the user approved changing).
 - **Auth is handled by the server, not the plugin.** The manager API under
   `/plugins/signalk-symbol-manager/api` is admin-gated by the server's global
   `/plugins` middleware, so the plugin adds no auth of its own. Provider
   `setResource`/`deleteResource` always reject (read-only).
-- **Scope was phased** (user choice): core first, editor second.
+- **`id`/`namespace` are mutable on edit.** SQLite has no row-rename, so
+  `store.rename` does `UPDATE ... SET namespace/id/svgFile` plus an
+  `fs.renameSync` of the asset, and rejects (409) if the new identity is taken.
+  The service runs the rename before the metadata update when a save carries a
+  changed id/namespace.
 - **SVG sanitizer is jsdom-free.** Uses `@xmldom/xmldom` (pure JS) with a strict
   element allowlist + attribute scrubbing (`src/sanitize.ts`), NOT DOMPurify.
   Reason: DOMPurify needs jsdom, which leaks at the native/realm level
@@ -75,9 +90,20 @@ Working notes for agents. Read alongside `README.md` and `REQUIREMENTS.md`.
 - Local verify: link into `~/.signalk/node_modules`, pre-enable via
   `~/.signalk/plugin-config-data/signalk-symbol-manager.json`, launch with
   `SIGNALK_NODE_CONFIG_DIR=$HOME/.signalk PORT=3000 bin/n2k-from-file` from
-  `signalk-server-node`.
+  `signalk-server-node`. There are two live test DBs:
+  `~/.signalk/plugin-config-data/signalk-symbol-manager/symbols.sqlite` and
+  `signalk-server-node/plugin-config-data/signalk-symbol-manager/symbols.sqlite`.
+- **No DB migration system** (pre-release). The schema is created by
+  `CREATE TABLE IF NOT EXISTS` on first run; existing tables are NOT altered.
+  When you add a column, new DBs get it automatically but existing test DBs need
+  a manual one-off `ALTER TABLE symbols ADD COLUMN ...` (stop the server first).
+  Both DBs above already have `gpxType` / `gpxSym` added this way.
 
 ## Tests
 
 - `npm test` builds the backend and runs `node:test` suites in `test/`
-  (symbolKey, sanitize, service) — 23 tests.
+  (symbolKey, sanitize, service) — 34 tests. `test/service.test.js` covers
+  create/update/delete, unqualified-id ambiguity, asset-url qualification,
+  id/namespace rename (asset move + 409 on collision), duplicate (incl. reusing
+  an id under a new namespace), and the `gpxType`/`gpxSym` round-trip
+  (create → public-resource exposure → empty-omission → update → duplicate).

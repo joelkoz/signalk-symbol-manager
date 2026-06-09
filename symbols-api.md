@@ -97,7 +97,9 @@ Returns an object keyed by canonical `namespace:id`:
     "roles": ["note", "waypoint", "map-marker"],
     "tags": ["diving"],
     "scale": 0.65,
-    "anchor": [1, 37]
+    "anchor": [1, 37],
+    "gpxType": "Dive Site",
+    "gpxSym": "Scuba Flag"
   },
   "user:anchorage": {
     "id": "anchorage",
@@ -150,6 +152,8 @@ Each symbol entry in the collection contains:
 | `tags` | | Free-form search/filter keywords |
 | `scale` | | Recommended OpenLayers icon scale for map-marker rendering |
 | `anchor` | | Recommended anchor point `[x, y]` in pixels from the top-left of the SVG |
+| `gpxType` | | Mapping to a GPX waypoint `<type>` value (see *GPX mapping* below) |
+| `gpxSym` | | Mapping to a GPX waypoint `<sym>` value (see *GPX mapping* below) |
 
 The object key in the collection must equal `` `${namespace}:${id}` ``.
 
@@ -185,6 +189,20 @@ anchor position  = [anchorX, anchorY] in source pixels from the SVG top-left
 The `anchor` point is the pixel that consumer apps pin to the geographic
 location on the chart. Without these values a consumer can still render the
 symbol, but size and placement will be renderer-default rather than precise.
+
+### GPX mapping
+
+`gpxType` and `gpxSym` are optional free-form strings that relate a symbol to a
+GPX waypoint's `<type>` and `<sym>` elements. They let a symbol-aware consumer:
+
+- **On GPX import** — choose a symbol whose `gpxType` / `gpxSym` matches the
+  imported waypoint's `<type>` / `<sym>`, instead of falling back to a default
+  icon.
+- **On GPX export** — write the symbol's `gpxType` / `gpxSym` back into the
+  exported waypoint so the mapping round-trips.
+
+Matching semantics (case sensitivity, `type` vs. `sym` precedence) are left to
+the consumer. Providers should emit these fields only when they carry a value.
 
 ### Deferred fields
 

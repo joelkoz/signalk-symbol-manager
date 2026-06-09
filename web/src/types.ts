@@ -13,6 +13,8 @@ export interface SymbolView {
   tags: string[]
   scale: number | null
   anchor: Anchor | null
+  gpxType: string
+  gpxSym: string
   width: number | null
   height: number | null
   url: string
@@ -65,6 +67,8 @@ export interface SymbolMeta {
   scale: string
   anchorX: string
   anchorY: string
+  gpxType: string
+  gpxSym: string
 }
 
 // Working draft used by the symbol form before it is persisted.
@@ -78,6 +82,8 @@ export interface SymbolDraft {
   tags: string[]
   scale: string
   anchor: { x: string; y: string }
+  gpxType: string
+  gpxSym: string
   svg: string
   width: number | null
   height: number | null

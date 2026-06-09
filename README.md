@@ -187,6 +187,11 @@ in the editor that is outside of the symbol to show the symbol-wide properties:
 - **Map-marker metadata** - **Scale** and **Anchor (X, Y)**. The fieldset
   turns amber and is labelled *required* when any chart-role checkbox is
   ticked.
+- **GPX mapping** - optional **GPX Type** and **GPX Sym** free-form text.
+  These record how the symbol maps to the `<type>` and `<sym>` fields of a
+  GPX waypoint, so a symbol-aware app can pick this symbol when importing a
+  GPX file (or write these values back when exporting). Leave them blank if
+  the symbol has no GPX equivalent.
 
 ### Preview
 

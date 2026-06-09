@@ -68,6 +68,8 @@ export function App() {
       tags: t.defaults.tags ?? [],
       scale: t.defaults.scale != null ? String(t.defaults.scale) : '',
       anchor: anchorStr(t.defaults.anchor),
+      gpxType: '',
+      gpxSym: '',
       svg: t.svg,
       width: n?.width ?? null,
       height: n?.height ?? null,
@@ -100,6 +102,8 @@ export function App() {
         tags: [],
         scale: '',
         anchor: { x: '', y: '' },
+        gpxType: '',
+        gpxSym: '',
         svg: result.svg,
         width: n?.width ?? null,
         height: n?.height ?? null
@@ -128,6 +132,8 @@ export function App() {
         tags: s.tags,
         scale: s.scale != null ? String(s.scale) : '',
         anchor: anchorStr(s.anchor),
+        gpxType: s.gpxType,
+        gpxSym: s.gpxSym,
         svg: svgText,
         width: s.width,
         height: s.height

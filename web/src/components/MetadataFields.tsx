@@ -125,6 +125,26 @@ export function MetadataFields({ meta, onChange, config, editing }: Props) {
           </label>
         </div>
       </fieldset>
+
+      <fieldset>
+        <legend>GPX mapping (optional)</legend>
+        <label>
+          GPX Type
+          <input
+            value={meta.gpxType}
+            onChange={(e) => onChange({ gpxType: e.target.value })}
+            placeholder="e.g. Dive Site"
+          />
+        </label>
+        <label>
+          GPX Sym
+          <input
+            value={meta.gpxSym}
+            onChange={(e) => onChange({ gpxSym: e.target.value })}
+            placeholder="e.g. Scuba Flag"
+          />
+        </label>
+      </fieldset>
     </div>
   )
 }
@@ -164,6 +184,8 @@ export function buildPayload(
     tags: meta.tags,
     scale,
     anchor,
+    gpxType: meta.gpxType.trim(),
+    gpxSym: meta.gpxSym.trim(),
     svg
   }
 }

@@ -217,6 +217,13 @@ Recommended fields:
 - `tags`
 - `scale`
 - `anchor`
+- `gpxType`
+- `gpxSym`
+
+`gpxType` and `gpxSym` are optional free-form strings that map the symbol to a
+GPX waypoint's `<type>` and `<sym>` fields, so a symbol-aware consumer can
+select this symbol on GPX import (or emit these values on GPX export). They are
+emitted on the public resource shape only when non-empty.
 
 Roles and tags have different semantics:
 
@@ -261,6 +268,7 @@ The SQLite datastore must support:
 - sanitized SVG file references
 - role/tag metadata
 - scale and anchor metadata
+- GPX type/sym mapping metadata (free-form strings, default empty)
 - nominal source width/height (internal; used to compute Freeboard display size for previews)
 - created/updated timestamps
 
@@ -410,6 +418,8 @@ A "Properties" panel where the user can edit:
      * support adding tags with keyboard delimiters, removing tags, preventing
        duplicates, and preserving tag order as entered
   * editing map-marker metadata: `scale` and `anchor`
+  * editing GPX mapping metadata: `gpxType` and `gpxSym` (optional free-form
+    text, grouped in their own fieldset)
  
 - Shape/Text specific properties (when an individual shape or text is selected)
 

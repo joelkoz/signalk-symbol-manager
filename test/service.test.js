@@ -127,6 +127,44 @@ test('duplicate into the same namespace+id is rejected', () => {
   )
 })
 
+test('gpxType/gpxSym round-trip through create, resource, update, duplicate', () => {
+  const rec = service.create({
+    id: 'dive-site',
+    name: 'Dive Site',
+    gpxType: 'Dive Site',
+    gpxSym: 'Scuba Flag',
+    svg: SVG
+  })
+  assert.equal(rec.gpxType, 'Dive Site')
+  assert.equal(rec.gpxSym, 'Scuba Flag')
+
+  // Exposed on the public resource shape (only when non-empty).
+  const res = service.listResources()['user:dive-site']
+  assert.equal(res.gpxType, 'Dive Site')
+  assert.equal(res.gpxSym, 'Scuba Flag')
+
+  // Empty values are omitted from the public resource shape.
+  const plain = service.create({ id: 'plain', name: 'Plain', svg: SVG })
+  assert.equal(plain.gpxType, '')
+  const plainRes = service.listResources()['user:plain']
+  assert.equal('gpxType' in plainRes, false)
+  assert.equal('gpxSym' in plainRes, false)
+
+  // Update edits the mappings.
+  const upd = service.update('user:dive-site', {
+    name: 'Dive Site',
+    gpxType: 'Wreck',
+    gpxSym: 'Anchor'
+  })
+  assert.equal(upd.gpxType, 'Wreck')
+  assert.equal(upd.gpxSym, 'Anchor')
+
+  // Duplicate copies the mappings.
+  const copy = service.duplicate('user:dive-site', 'dive-site-2')
+  assert.equal(copy.gpxType, 'Wreck')
+  assert.equal(copy.gpxSym, 'Anchor')
+})
+
 test('update edits metadata and delete removes symbol + asset', () => {
   const rec = service.create({ id: 'a', name: 'A', svg: SVG })
   const assetPath = path.join(dir, 'assets', rec.svgFile)
