@@ -56,9 +56,6 @@
     "assets",
     "docs/screenshots",
     "README.md",
-    "REQUIREMENTS.md",
-    "AGENTS.md",
-    "CLAUDE.md",
     "LICENSE"
   ],
   "author": "Joel Kozikowski",
