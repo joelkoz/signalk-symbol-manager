@@ -1,6 +1,6 @@
 {
   "name": "signalk-symbol-manager",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "Create and manage chart symbols (icons for waypoints, notes, etc.)",
   "main": "plugin/index.js",
   "scripts": {
@@ -17,7 +17,8 @@
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-webapp",
-    "signalk-category-utility",
+    "signalk-category-chart-plotters",
+    "signalk-category-chart-utility",
     "signalk",
     "symbols",
     "icons",
@@ -27,7 +28,26 @@
   ],
   "signalk": {
     "appIcon": "assets/symbol-manager.png",
-    "displayName": "Symbol Manager"
+    "displayName": "Chart Symbol Manager",
+    "screenshots": [
+      "./docs/screenshots/1_symbol-manager.png",
+      "./docs/screenshots/2_symbol-manager.png",
+      "./docs/screenshots/3_symbol-manager.png",
+    ],
+    "appstore": {
+      "displayName": "Chart Symbol Manager",
+      "categories": [
+        "chart-plotters",
+        "utilities"
+      ],
+      "author": "Joel Kozikowski",
+      "description": "Chart marker SVG editor with symbol provider"
+    },
+    "webapp": {
+      "name": "Chart Symbol Manager",
+      "description": "Chart marker SVG editor with symbol provider",
+      "location": "/plugins/signalk-symbol-provider/"
+    }
   },
   "files": [
     "plugin",
