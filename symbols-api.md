@@ -228,19 +228,18 @@ qualified alias (`namespace:id`), or an unqualified local id.
 
 ### Qualified reference — `fsk:dive-site`
 
-Resolve to the symbol that carries that exact alias. If none, show a fallback —
-do not silently substitute a different alias's symbol.
+Resolve to the symbol that carries that exact alias. If none, providers should return a 404 error. Consumers should display a fallback symbol. Do not silently substitute a different alias's symbol.
 
 ### Unqualified reference — `dive-site`
 
 Resolve to the symbol carrying an alias with that `id`. If more than one symbol
 carries an alias with the same id, the reference is ambiguous; consumers should
-prefer a qualified alias to avoid this.
+prefer a qualified alias to avoid this. Providers should throw a 400 error.
 
 ### Explicit default reference — `default:dive-site`
 
 Resolve only within the consumer's built-in symbols, ignoring all external
-providers.
+providers.  Providers should never store a symbol with the namespace `default`
 
 ### Consumer override by vendor code
 
