@@ -33,31 +33,48 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+// Tolerate either alias shape from the server: canonical "namespace:id" strings
+// (current) or `{namespace, id}` objects, normalising to strings so the UI never
+// tries to render an object as a React child.
+function normalizeView(s: SymbolView): SymbolView {
+  const raw = (s as unknown as { alias?: unknown }).alias
+  const alias = Array.isArray(raw)
+    ? raw.map((a) =>
+        typeof a === 'string'
+          ? a
+          : `${(a as { namespace: string }).namespace}:${(a as { id: string }).id}`
+      )
+    : []
+  return { ...s, alias }
+}
+
 export const api = {
   config: () => request<AppConfig>('/config'),
   templates: () => request<SymbolTemplate[]>('/templates'),
-  list: () => request<SymbolView[]>('/symbols'),
-  get: (ref: string) => request<SymbolView>(`/symbols/${encodeURIComponent(ref)}`),
-  create: (body: unknown) =>
-    request<SymbolView>('/symbols', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    }),
-  update: (ref: string, body: unknown) =>
-    request<SymbolView>(`/symbols/${encodeURIComponent(ref)}`, {
-      method: 'PUT',
-      body: JSON.stringify(body)
-    }),
-  duplicate: (
-    ref: string,
-    newId: string,
-    newNamespace?: string,
-    newName?: string
-  ) =>
-    request<SymbolView>(`/symbols/${encodeURIComponent(ref)}/duplicate`, {
-      method: 'POST',
-      body: JSON.stringify({ newId, newNamespace, newName })
-    }),
+  list: async () => (await request<SymbolView[]>('/symbols')).map(normalizeView),
+  get: async (ref: string) =>
+    normalizeView(await request<SymbolView>(`/symbols/${encodeURIComponent(ref)}`)),
+  create: async (body: unknown) =>
+    normalizeView(
+      await request<SymbolView>('/symbols', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      })
+    ),
+  update: async (ref: string, body: unknown) =>
+    normalizeView(
+      await request<SymbolView>(`/symbols/${encodeURIComponent(ref)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      })
+    ),
+  duplicate: async (ref: string, alias?: string[], newName?: string) =>
+    normalizeView(
+      await request<SymbolView>(`/symbols/${encodeURIComponent(ref)}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify({ alias, newName })
+      })
+    ),
   remove: (ref: string) =>
     request<{ deleted: string }>(`/symbols/${encodeURIComponent(ref)}`, {
       method: 'DELETE'

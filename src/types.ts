@@ -1,13 +1,14 @@
 // Shared backend types for the Signal K Symbol Manager plugin.
 //
-// `SymbolDefinition` mirrors the provider-owned payload described in the
-// symbol resource RFC. `SymbolResource` is what the resources API returns:
-// the definition plus Signal K `Resource<T>` response metadata (`$source`,
-// `timestamp`).
+// A symbol is identified by an immutable `uuid`. Consumer-facing references use
+// one or more `alias` entries, each a `<namespace>:<id>` pair. A single symbol
+// may carry several aliases so it can be matched by different chartplotters
+// (e.g. `custom:dive-flag`, `fsk:dive-site`, `garmin:Diver Down Flag 1`).
 
 export const PROVIDER_ID = 'signalk-symbol-manager'
 export const SYMBOL_RESOURCE_TYPE = 'symbols' as const
-export const DEFAULT_NAMESPACE = 'user'
+// User-created symbols default to the `custom` vendor namespace.
+export const DEFAULT_NAMESPACE = 'custom'
 
 // Controlled advisory role vocabulary presented to the user as checkboxes.
 export const SYMBOL_ROLES = [
@@ -28,9 +29,17 @@ export const MAP_MARKER_ROLES = ['note', 'waypoint', 'map-marker'] as const
 
 export type Anchor = [number, number]
 
-export interface SymbolDefinition {
-  id: string
+// A single `<namespace>:<id>` alias for a symbol.
+export interface SymbolAlias {
   namespace: string
+  id: string
+}
+
+// The consumer-facing payload returned by the resources API.
+export interface SymbolDefinition {
+  uuid: string
+  // One or more canonical `<namespace>:<id>` references. At least one required.
+  alias: string[]
   name: string
   description?: string
   mediaType: 'image/svg+xml'
@@ -49,11 +58,11 @@ export interface SymbolResource extends SymbolDefinition {
   timestamp: string
 }
 
-// A fully materialised symbol as stored by the plugin. The SVG markup lives
-// on disk; everything else is persisted in SQLite.
+// A fully materialised symbol as stored by the plugin. The SVG markup lives on
+// disk (keyed by uuid); everything else is persisted in SQLite.
 export interface SymbolRecord {
-  id: string
-  namespace: string
+  uuid: string
+  alias: SymbolAlias[]
   name: string
   description: string
   mediaType: 'image/svg+xml'
@@ -65,7 +74,7 @@ export interface SymbolRecord {
   gpxType: string
   gpxSym: string
   // Nominal source dimensions (px), from the SVG width/height or viewBox. Used
-  // by consumers/previews to compute Freeboard display size = width * scale.
+  // by consumers/previews to compute display size = width * scale.
   width: number | null
   height: number | null
   svgFile: string
@@ -75,8 +84,8 @@ export interface SymbolRecord {
 
 // Input accepted by create/update operations from the manager API.
 export interface SymbolInput {
-  id?: string
-  namespace?: string
+  // Aliases as `<namespace>:<id>` strings (at least one required on create).
+  alias?: string[]
   name?: string
   description?: string
   roles?: SymbolRole[]

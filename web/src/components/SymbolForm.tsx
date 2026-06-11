@@ -19,8 +19,7 @@ interface Props {
 
 function draftToMeta(draft: SymbolDraft): SymbolMeta {
   return {
-    id: draft.id,
-    namespace: draft.namespace,
+    alias: draft.alias,
     name: draft.name,
     description: draft.description,
     roles: draft.roles,
@@ -85,7 +84,7 @@ export function SymbolForm({ draft, config, onSaved, onCancel }: Props) {
     setBusy(true)
     try {
       if (draft.mode === 'create') await api.create(payload)
-      else await api.update(`${draft.namespace}:${draft.id}`, payload)
+      else await api.update(draft.uuid!, payload)
       onSaved()
     } catch (e) {
       setError((e as Error).message)
@@ -97,7 +96,7 @@ export function SymbolForm({ draft, config, onSaved, onCancel }: Props) {
   return (
     <div className="editor">
       <div className="editor-header">
-        <h2>{draft.mode === 'create' ? 'New symbol (upload)' : `Edit ${draft.namespace}:${draft.id}`}</h2>
+        <h2>{draft.mode === 'create' ? 'New symbol (upload)' : `Edit ${draft.name}`}</h2>
         <div className="spacer" />
         <button onClick={onCancel} disabled={busy}>
           Cancel
@@ -139,7 +138,7 @@ export function SymbolForm({ draft, config, onSaved, onCancel }: Props) {
 
         <div className="editor-props">
           <h3>Properties</h3>
-          <MetadataFields meta={meta} onChange={update} config={config} editing={draft.mode === 'edit'} />
+          <MetadataFields meta={meta} onChange={update} config={config} />
           {hasFillTarget ? (
             <label className="fill-field">
               Fill color
