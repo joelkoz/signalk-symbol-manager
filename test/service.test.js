@@ -11,6 +11,9 @@ const { ValidationError } = require('../plugin/symbolKey')
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="37" height="37" viewBox="0 0 37 37"><rect width="37" height="37" fill="#d71920"/></svg>'
 
+// Alias pairs of a record as canonical "namespace:id" strings, for assertions.
+const aliasStrings = (rec) => rec.alias.map((a) => `${a.namespace}:${a.id}`)
+
 let dir
 let store
 let service
@@ -18,7 +21,7 @@ let service
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'symmgr-'))
   store = new SymbolStore(dir)
-  service = new SymbolService(store, { defaultNamespace: 'user', maxSvgBytes: 256 * 1024 })
+  service = new SymbolService(store, { defaultNamespace: 'custom', maxSvgBytes: 256 * 1024 })
 })
 
 afterEach(() => {
@@ -26,21 +29,30 @@ afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
-test('create defaults namespace to "user" and sanitizes svg', () => {
-  const rec = service.create({ id: 'dive-site', name: 'Dive Site', svg: SVG })
-  assert.equal(rec.namespace, 'user')
-  assert.equal(rec.id, 'dive-site')
+test('create assigns a uuid, defaults the alias to custom:symbolN, and sanitizes svg', () => {
+  const rec = service.create({ name: 'Dive Site', svg: SVG })
+  assert.match(rec.uuid, /^[0-9a-f-]{36}$/)
+  assert.deepEqual(aliasStrings(rec), ['custom:symbol1'])
   const svg = service.readSvg(rec)
   assert.ok(/<svg/.test(svg))
 })
 
+test('explicit aliases are validated and de-duplicated', () => {
+  const rec = service.create({
+    alias: ['custom:dive-flag', 'fsk:dive-site', 'custom:dive-flag'],
+    name: 'Dive Flag',
+    svg: SVG
+  })
+  assert.deepEqual(aliasStrings(rec), ['custom:dive-flag', 'fsk:dive-site'])
+})
+
 test('map-marker role requires scale and anchor', () => {
   assert.throws(
-    () => service.create({ id: 'm1', name: 'M', roles: ['note'], svg: SVG }),
+    () => service.create({ alias: ['custom:m1'], name: 'M', roles: ['note'], svg: SVG }),
     ValidationError
   )
   const ok = service.create({
-    id: 'm1',
+    alias: ['custom:m1'],
     name: 'M',
     roles: ['note', 'waypoint'],
     scale: 0.65,
@@ -52,84 +64,87 @@ test('map-marker role requires scale and anchor', () => {
 })
 
 test('non-map-marker symbol may omit scale/anchor', () => {
-  const rec = service.create({ id: 'btn', name: 'Button', roles: ['button'], svg: SVG })
+  const rec = service.create({ alias: ['custom:btn'], name: 'Button', roles: ['button'], svg: SVG })
   assert.equal(rec.scale, null)
   assert.equal(rec.anchor, null)
 })
 
-test('listResources is keyed by namespace:id with $source and timestamp', () => {
-  service.create({ id: 'dive-site', name: 'Dive Site', svg: SVG })
+test('listResources is keyed by uuid with alias[], $source and timestamp', () => {
+  const rec = service.create({ alias: ['user:dive-site'], name: 'Dive Site', svg: SVG })
   const all = service.listResources()
-  assert.ok(all['user:dive-site'])
-  const r = all['user:dive-site']
-  assert.equal(r.namespace, 'user')
-  assert.equal(r.id, 'dive-site')
+  const r = all[rec.uuid]
+  assert.ok(r)
+  assert.equal(r.uuid, rec.uuid)
+  assert.deepEqual(r.alias, ['user:dive-site'])
   assert.equal(r.$source, 'signalk-symbol-manager')
-  assert.ok(typeof r.timestamp === 'string')
+  assert.equal(typeof r.timestamp, 'string')
   assert.equal(r.mediaType, 'image/svg+xml')
-  assert.equal(r.url, `${ASSET_BASE}/dive-site.svg`)
+  assert.equal(r.url, `${ASSET_BASE}/${encodeURIComponent(rec.uuid)}.svg`)
 })
 
-test('unqualified resolve works when unique, throws when ambiguous', () => {
-  service.create({ id: 'dive-site', namespace: 'user', name: 'A', svg: SVG })
-  assert.equal(service.resolve('dive-site').namespace, 'user')
-  assert.equal(service.resolve('user:dive-site').namespace, 'user')
+test('resolve works by uuid, qualified alias, and unique local id; ambiguous local id throws 409', () => {
+  const a = service.create({ alias: ['user:dive-site'], name: 'A', svg: SVG })
+  assert.equal(service.resolve(a.uuid).uuid, a.uuid)
+  assert.equal(service.resolve('user:dive-site').uuid, a.uuid)
+  assert.equal(service.resolve('dive-site').uuid, a.uuid)
 
-  service.create({ id: 'dive-site', namespace: 'fleet', name: 'B', svg: SVG })
-  assert.throws(() => service.resolve('dive-site'), (e) => {
-    assert.ok(e instanceof ValidationError)
-    assert.equal(e.status, 409)
-    return true
-  })
-  // qualified still resolves
+  service.create({ alias: ['fleet:dive-site'], name: 'B', svg: SVG })
+  assert.throws(
+    () => service.resolve('dive-site'),
+    (e) => {
+      assert.ok(e instanceof ValidationError)
+      assert.equal(e.status, 409)
+      return true
+    }
+  )
+  // Qualified aliases still resolve unambiguously.
   assert.equal(service.resolve('fleet:dive-site').name, 'B')
 })
 
-test('asset url switches to qualified form when local id is ambiguous', () => {
-  service.create({ id: 'x', namespace: 'user', name: 'A', svg: SVG })
-  let res = service.listResources()
-  assert.equal(res['user:x'].url, `${ASSET_BASE}/x.svg`)
+test('the asset url is uuid-based and stable across alias edits', () => {
+  const rec = service.create({ alias: ['user:x'], name: 'A', svg: SVG })
+  const url1 = service.listResources()[rec.uuid].url
+  assert.equal(url1, `${ASSET_BASE}/${encodeURIComponent(rec.uuid)}.svg`)
 
-  service.create({ id: 'x', namespace: 'other', name: 'B', svg: SVG })
-  res = service.listResources()
-  assert.equal(res['user:x'].url, `${ASSET_BASE}/${encodeURIComponent('user:x')}.svg`)
-  assert.equal(res['other:x'].url, `${ASSET_BASE}/${encodeURIComponent('other:x')}.svg`)
+  const upd = service.update(rec.uuid, { name: 'A', alias: ['user:x', 'garmin:Anchor'] })
+  assert.equal(upd.uuid, rec.uuid)
+  const url2 = service.listResources()[rec.uuid].url
+  assert.equal(url2, url1)
 })
 
-test('duplicate creates an independent copy', () => {
-  service.create({ id: 'a', name: 'A', svg: SVG })
-  const copy = service.duplicate('user:a', 'b', undefined, 'B')
-  assert.equal(copy.id, 'b')
-  assert.equal(copy.namespace, 'user')
+test('duplicate creates an independent copy with a new uuid', () => {
+  const a = service.create({ alias: ['user:a'], name: 'A', svg: SVG })
+  const copy = service.duplicate(a.uuid, ['user:b'], 'B')
+  assert.notEqual(copy.uuid, a.uuid)
+  assert.deepEqual(aliasStrings(copy), ['user:b'])
   assert.equal(copy.name, 'B')
   assert.equal(service.list().length, 2)
 })
 
-test('duplicate can reuse the same id under a different namespace', () => {
-  service.create({ id: 'a', name: 'A', svg: SVG })
-  const copy = service.duplicate('user:a', 'a', 'mine')
-  assert.equal(copy.id, 'a')
-  assert.equal(copy.namespace, 'mine')
-  // Same id + different namespace coexist.
+test('duplicate can reuse the same local id under a different namespace', () => {
+  const a = service.create({ alias: ['user:a'], name: 'A', svg: SVG })
+  const copy = service.duplicate('user:a', ['mine:a'])
+  assert.deepEqual(aliasStrings(copy), ['mine:a'])
   assert.equal(service.list().length, 2)
-  assert.equal(service.resolve('user:a').namespace, 'user')
-  assert.equal(service.resolve('mine:a').namespace, 'mine')
+  assert.equal(service.resolve('user:a').uuid, a.uuid)
+  assert.equal(service.resolve('mine:a').uuid, copy.uuid)
 })
 
-test('duplicate into the same namespace+id is rejected', () => {
-  service.create({ id: 'a', name: 'A', svg: SVG })
+test('duplicate onto an existing alias is rejected and leaves no orphan', () => {
+  service.create({ alias: ['user:a'], name: 'A', svg: SVG })
   assert.throws(
-    () => service.duplicate('user:a', 'a', 'user'),
+    () => service.duplicate('user:a', ['user:a']),
     (e) => {
       assert.equal(e.status, 409)
       return true
     }
   )
+  assert.equal(service.list().length, 1)
 })
 
 test('gpxType/gpxSym round-trip through create, resource, update, duplicate', () => {
   const rec = service.create({
-    id: 'dive-site',
+    alias: ['user:dive-site'],
     name: 'Dive Site',
     gpxType: 'Dive Site',
     gpxSym: 'Scuba Flag',
@@ -139,18 +154,18 @@ test('gpxType/gpxSym round-trip through create, resource, update, duplicate', ()
   assert.equal(rec.gpxSym, 'Scuba Flag')
 
   // Exposed on the public resource shape (only when non-empty).
-  const res = service.listResources()['user:dive-site']
+  const res = service.listResources()[rec.uuid]
   assert.equal(res.gpxType, 'Dive Site')
   assert.equal(res.gpxSym, 'Scuba Flag')
 
   // Empty values are omitted from the public resource shape.
-  const plain = service.create({ id: 'plain', name: 'Plain', svg: SVG })
+  const plain = service.create({ alias: ['user:plain'], name: 'Plain', svg: SVG })
   assert.equal(plain.gpxType, '')
-  const plainRes = service.listResources()['user:plain']
+  const plainRes = service.listResources()[plain.uuid]
   assert.equal('gpxType' in plainRes, false)
   assert.equal('gpxSym' in plainRes, false)
 
-  // Update edits the mappings.
+  // Update edits the mappings (aliases kept when omitted).
   const upd = service.update('user:dive-site', {
     name: 'Dive Site',
     gpxType: 'Wreck',
@@ -160,17 +175,18 @@ test('gpxType/gpxSym round-trip through create, resource, update, duplicate', ()
   assert.equal(upd.gpxSym, 'Anchor')
 
   // Duplicate copies the mappings.
-  const copy = service.duplicate('user:dive-site', 'dive-site-2')
+  const copy = service.duplicate('user:dive-site', ['user:dive-site-2'])
   assert.equal(copy.gpxType, 'Wreck')
   assert.equal(copy.gpxSym, 'Anchor')
 })
 
 test('update edits metadata and delete removes symbol + asset', () => {
-  const rec = service.create({ id: 'a', name: 'A', svg: SVG })
+  const rec = service.create({ alias: ['user:a'], name: 'A', svg: SVG })
   const assetPath = path.join(dir, 'assets', rec.svgFile)
   assert.ok(fs.existsSync(assetPath))
 
   const upd = service.update('user:a', { name: 'A2', roles: ['button'], tags: ['x', 'y'] })
+  assert.equal(upd.uuid, rec.uuid)
   assert.equal(upd.name, 'A2')
   assert.deepEqual(upd.tags, ['x', 'y'])
 
@@ -179,53 +195,59 @@ test('update edits metadata and delete removes symbol + asset', () => {
   assert.ok(!fs.existsSync(assetPath))
 })
 
-test('update renames id/namespace, moving the asset and key', () => {
-  const rec = service.create({ id: 'old-id', name: 'Old', svg: SVG })
-  const oldAsset = path.join(dir, 'assets', rec.svgFile)
-  assert.ok(fs.existsSync(oldAsset))
+test('update replaces aliases while keeping the immutable uuid and asset', () => {
+  const rec = service.create({ alias: ['user:old-id'], name: 'Old', svg: SVG })
+  const asset = path.join(dir, 'assets', rec.svgFile)
+  assert.ok(fs.existsSync(asset))
 
   const upd = service.update('user:old-id', {
-    id: 'new-id',
-    namespace: 'mine',
     name: 'New',
+    alias: ['mine:new-id'],
     svg: SVG
   })
-  assert.equal(upd.id, 'new-id')
-  assert.equal(upd.namespace, 'mine')
+  assert.equal(upd.uuid, rec.uuid)
+  assert.deepEqual(aliasStrings(upd), ['mine:new-id'])
 
-  // Old identity is gone; new identity resolves; old asset file moved.
+  // The old alias no longer resolves; the new alias does; the asset is the same
+  // uuid-keyed file (never moved).
   assert.throws(() => service.resolve('user:old-id'), (e) => e.status === 404)
   assert.equal(service.resolve('mine:new-id').name, 'New')
-  assert.ok(!fs.existsSync(oldAsset))
-  assert.ok(fs.existsSync(path.join(dir, 'assets', upd.svgFile)))
+  assert.equal(upd.svgFile, rec.svgFile)
+  assert.ok(fs.existsSync(asset))
 })
 
-test('rename onto an existing identity is rejected', () => {
-  service.create({ id: 'a', name: 'A', svg: SVG })
-  service.create({ id: 'b', name: 'B', svg: SVG })
+test('reassigning an alias already owned by another symbol is rejected, leaving the original untouched', () => {
+  service.create({ alias: ['user:a'], name: 'A', svg: SVG })
+  service.create({ alias: ['user:b'], name: 'B', svg: SVG })
   assert.throws(
-    () => service.update('user:a', { id: 'b', name: 'A', svg: SVG }),
+    () => service.update('user:a', { name: 'A', alias: ['user:b'], svg: SVG }),
     (e) => {
       assert.equal(e.status, 409)
       return true
     }
   )
-  // The failed rename left the original untouched.
-  assert.equal(service.resolve('user:a').name, 'A')
+  // The failed reassignment rolled back: the original keeps its identity.
+  const a = service.resolve('user:a')
+  assert.equal(a.name, 'A')
+  assert.deepEqual(aliasStrings(a), ['user:a'])
 })
 
-test('update without id/namespace keeps the current identity', () => {
-  service.create({ id: 'a', name: 'A', svg: SVG })
+test('update without an alias keeps the current aliases', () => {
+  const a = service.create({ alias: ['user:a'], name: 'A', svg: SVG })
   const upd = service.update('user:a', { name: 'A2' })
-  assert.equal(upd.id, 'a')
-  assert.equal(upd.namespace, 'user')
+  assert.equal(upd.uuid, a.uuid)
+  assert.deepEqual(aliasStrings(upd), ['user:a'])
   assert.equal(upd.name, 'A2')
 })
 
-test('duplicate id within same namespace is rejected', () => {
-  service.create({ id: 'a', name: 'A', svg: SVG })
-  assert.throws(() => service.create({ id: 'a', name: 'A2', svg: SVG }), (e) => {
-    assert.equal(e.status, 409)
-    return true
-  })
+test('creating a symbol with an already-used alias is rejected and leaves no orphan', () => {
+  service.create({ alias: ['user:a'], name: 'A', svg: SVG })
+  assert.throws(
+    () => service.create({ alias: ['user:a'], name: 'A2', svg: SVG }),
+    (e) => {
+      assert.equal(e.status, 409)
+      return true
+    }
+  )
+  assert.equal(service.list().length, 1)
 })

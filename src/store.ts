@@ -361,37 +361,57 @@ export class SymbolStore {
     })
   }
 
+  // Run mutations inside a single transaction, rolling back on any error so a
+  // failed alias insert (e.g. a 409 collision) never leaves a partially written
+  // symbol or an orphaned alias behind.
+  private inTransaction<T>(fn: () => T): T {
+    this.db.exec('BEGIN')
+    try {
+      const result = fn()
+      this.db.exec('COMMIT')
+      return result
+    } catch (e) {
+      this.db.exec('ROLLBACK')
+      throw e
+    }
+  }
+
   create(input: NewSymbol): SymbolRecord {
     if (!input.alias || input.alias.length === 0) {
       throw new ValidationError('at least one alias is required')
     }
     const uuid = newUuid()
     const now = new Date().toISOString()
-    const svgFile = this.writeAsset(uuid, input.svg)
-    this.db
-      .prepare(
-        `INSERT INTO symbols
-          (uuid, name, description, mediaType, roles, tags, scale, anchorX, anchorY, gpxType, gpxSym, width, height, svgFile, createdAt, updatedAt)
-         VALUES (?, ?, ?, 'image/svg+xml', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        uuid,
-        input.name,
-        input.description,
-        JSON.stringify(input.roles),
-        JSON.stringify(input.tags),
-        input.scale,
-        input.anchor ? input.anchor[0] : null,
-        input.anchor ? input.anchor[1] : null,
-        input.gpxType,
-        input.gpxSym,
-        input.width,
-        input.height,
-        svgFile,
-        now,
-        now
-      )
-    this.insertAliases(uuid, input.alias)
+    // Compute the asset path up front but only write the file after the database
+    // transaction commits, so a rejected create never orphans an SVG on disk.
+    const svgFile = this.assetRelPath(uuid)
+    this.inTransaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO symbols
+            (uuid, name, description, mediaType, roles, tags, scale, anchorX, anchorY, gpxType, gpxSym, width, height, svgFile, createdAt, updatedAt)
+           VALUES (?, ?, ?, 'image/svg+xml', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          uuid,
+          input.name,
+          input.description,
+          JSON.stringify(input.roles),
+          JSON.stringify(input.tags),
+          input.scale,
+          input.anchor ? input.anchor[0] : null,
+          input.anchor ? input.anchor[1] : null,
+          input.gpxType,
+          input.gpxSym,
+          input.width,
+          input.height,
+          svgFile,
+          now,
+          now
+        )
+      this.insertAliases(uuid, input.alias)
+    })
+    this.writeAsset(uuid, input.svg)
     return this.getByUuid(uuid)!
   }
 
@@ -426,32 +446,37 @@ export class SymbolStore {
       typeof patch.svg === 'string' ? patch.width ?? null : existing.width
     const height =
       typeof patch.svg === 'string' ? patch.height ?? null : existing.height
+    // Apply metadata + alias changes atomically. The asset is written only after
+    // the transaction commits, so a rejected update (e.g. an alias collision)
+    // leaves both the row and the on-disk SVG untouched.
+    this.inTransaction(() => {
+      this.db
+        .prepare(
+          `UPDATE symbols
+              SET name = ?, description = ?, roles = ?, tags = ?, scale = ?, anchorX = ?, anchorY = ?, gpxType = ?, gpxSym = ?, width = ?, height = ?, updatedAt = ?
+            WHERE uuid = ?`
+        )
+        .run(
+          patch.name,
+          patch.description,
+          JSON.stringify(patch.roles),
+          JSON.stringify(patch.tags),
+          patch.scale,
+          patch.anchor ? patch.anchor[0] : null,
+          patch.anchor ? patch.anchor[1] : null,
+          patch.gpxType,
+          patch.gpxSym,
+          width,
+          height,
+          now,
+          uuid
+        )
+      this.db.prepare('DELETE FROM symbol_aliases WHERE uuid = ?').run(uuid)
+      this.insertAliases(uuid, patch.alias)
+    })
     if (typeof patch.svg === 'string') {
       this.writeAsset(uuid, patch.svg)
     }
-    this.db
-      .prepare(
-        `UPDATE symbols
-            SET name = ?, description = ?, roles = ?, tags = ?, scale = ?, anchorX = ?, anchorY = ?, gpxType = ?, gpxSym = ?, width = ?, height = ?, updatedAt = ?
-          WHERE uuid = ?`
-      )
-      .run(
-        patch.name,
-        patch.description,
-        JSON.stringify(patch.roles),
-        JSON.stringify(patch.tags),
-        patch.scale,
-        patch.anchor ? patch.anchor[0] : null,
-        patch.anchor ? patch.anchor[1] : null,
-        patch.gpxType,
-        patch.gpxSym,
-        width,
-        height,
-        now,
-        uuid
-      )
-    this.db.prepare('DELETE FROM symbol_aliases WHERE uuid = ?').run(uuid)
-    this.insertAliases(uuid, patch.alias)
     return this.getByUuid(uuid)!
   }
 
