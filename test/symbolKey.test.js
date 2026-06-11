@@ -9,9 +9,10 @@ const {
   ValidationError
 } = require('../plugin/symbolKey')
 
-test('validateNamespace accepts [A-Za-z0-9_]+', () => {
+test('validateNamespace accepts [A-Za-z0-9_-]+', () => {
   assert.equal(validateNamespace('user'), 'user')
   assert.equal(validateNamespace('my_custom1'), 'my_custom1')
+  assert.equal(validateNamespace('signalk-symbol-manager'), 'signalk-symbol-manager')
 })
 
 test('validateNamespace rejects blank, ":", bad chars, and reserved', () => {

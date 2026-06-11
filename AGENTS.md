@@ -128,7 +128,7 @@ user
 ```
 
 `namespace` is symbol metadata used by consumers for symbol lookup and collision
-resolution. It must match `[A-Za-z0-9_]+`. `$source` is separate Signal K
+resolution. It must match `[A-Za-z0-9_-]+`. `$source` is separate Signal K
 `Resource<T>` metadata and remains the provider plugin id.
 
 Do not implement native S-57/ENC portrayal changes in this plugin. S-57/ENC

@@ -142,7 +142,7 @@ resolution. It is separate from Signal K `$source` response metadata.
 Namespace rules:
 
 - `namespace` is required.
-- `namespace` must match `[A-Za-z0-9_]+`.
+- `namespace` must match `[A-Za-z0-9_-]+`.
 
 The plugin may allow the user to choose a different namespace, but the default
 for user-managed Symbol Manager symbols must be `user`.

@@ -234,7 +234,7 @@ export function MetadataFields({
   )
 }
 
-const NS_RE = /^[A-Za-z0-9_]+$/
+const NS_RE = /^[A-Za-z0-9_-]+$/
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 
 // Validate metadata + svg into a save payload, or return an error string.
@@ -250,7 +250,7 @@ export function buildPayload(
     const ns = r.namespace.trim()
     const id = r.id.trim()
     if (ns === '' && id === '') continue
-    if (!NS_RE.test(ns)) return `alias namespace "${ns}" must match [A-Za-z0-9_]+`
+    if (!NS_RE.test(ns)) return `alias namespace "${ns}" must match [A-Za-z0-9_-]+`
     if (ns === 'default') return 'alias namespace "default" is reserved'
     if (!ID_RE.test(id))
       return `alias id "${id}" must start with a letter/digit and use letters, digits, "-" or "_"`

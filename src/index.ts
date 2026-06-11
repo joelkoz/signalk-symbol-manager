@@ -89,7 +89,7 @@ module.exports = (app: SymbolManagerApp): Plugin => {
           type: 'string',
           title: 'Default symbol namespace',
           description:
-            'Namespace used for the default alias of new symbols when none is given. Must match [A-Za-z0-9_]+ and may not be "default".',
+            'Namespace used for the default alias of new symbols when none is given. Must match [A-Za-z0-9_-]+ and may not be "default".',
           default: 'custom'
         },
         maxSvgKb: {

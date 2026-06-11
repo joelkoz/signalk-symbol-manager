@@ -8,7 +8,7 @@
 
 import { randomUUID } from 'node:crypto'
 
-export const NAMESPACE_RE = /^[A-Za-z0-9_]+$/
+export const NAMESPACE_RE = /^[A-Za-z0-9_-]+$/
 // Local ids may not contain ':' (the namespace separator) or '/' (path
 // separator for asset routes). We allow a friendly slug character set.
 export const LOCAL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
@@ -50,7 +50,7 @@ export function validateNamespace(namespace: unknown): string {
     throw new ValidationError('namespace must not contain ":"')
   }
   if (!NAMESPACE_RE.test(namespace)) {
-    throw new ValidationError('namespace must match [A-Za-z0-9_]+')
+    throw new ValidationError('namespace must match [A-Za-z0-9_-]+')
   }
   if (RESERVED_NAMESPACES.has(namespace)) {
     throw new ValidationError(`namespace "${namespace}" is reserved`)
