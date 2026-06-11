@@ -3,7 +3,7 @@
 // map-marker scale / anchor. Controlled via a `meta` object + `onChange` patch.
 
 import { TagsInput } from 'react-tag-input-component'
-import { AppConfig, SymbolMeta } from '../types'
+import { AliasRow, AppConfig, SymbolMeta } from '../types'
 
 // Which groups of fields to render. The visual editor splits the panel:
 // `identity` (id/namespace/name/description/GPX) on the right next to the
@@ -15,9 +15,6 @@ interface Props {
   meta: SymbolMeta
   onChange: (patch: Partial<SymbolMeta>) => void
   config: AppConfig
-  // True when editing an existing symbol. Id/namespace stay editable (changing
-  // them renames the symbol), but we surface a hint so it isn't a surprise.
-  editing: boolean
   sections?: MetaSection
 }
 
@@ -25,11 +22,90 @@ export function isMapMarker(roles: string[], config: AppConfig): boolean {
   return roles.some((r) => config.mapMarkerRoles.includes(r))
 }
 
+// Variable-length editor for a symbol's `<namespace>:<id>` aliases. A symbol may
+// carry several so it can be matched by different chartplotters (e.g.
+// `custom:dive-flag`, `fsk:dive-site`, `garmin:Diver Down Flag 1`). At least one
+// alias is required; the immutable uuid identifies the symbol, so editing
+// aliases never renames anything on disk.
+function AliasEditor({
+  alias,
+  defaultNamespace,
+  onChange
+}: {
+  alias: AliasRow[]
+  defaultNamespace: string
+  onChange: (alias: AliasRow[]) => void
+}) {
+  const rows = alias.length ? alias : [{ namespace: defaultNamespace, id: '' }]
+  const setRow = (i: number, patch: Partial<AliasRow>) =>
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const addRow = () =>
+    onChange([...rows, { namespace: defaultNamespace, id: '' }])
+  const removeRow = (i: number) => onChange(rows.filter((_, idx) => idx !== i))
+
+  return (
+    <fieldset className="alias-editor required">
+      <legend>Aliases (at least one)</legend>
+      <table className="alias-table">
+        <thead>
+          <tr>
+            <th>Namespace</th>
+            <th>Id</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>
+              <td>
+                <input
+                  value={r.namespace}
+                  onChange={(e) => setRow(i, { namespace: e.target.value })}
+                  placeholder="custom"
+                />
+              </td>
+              <td>
+                <input
+                  value={r.id}
+                  onChange={(e) => setRow(i, { id: e.target.value })}
+                  placeholder="dive-site"
+                />
+              </td>
+              <td>
+                <button
+                  type="button"
+                  className="link danger"
+                  disabled={rows.length <= 1}
+                  title={
+                    rows.length <= 1
+                      ? 'At least one alias is required'
+                      : 'Remove alias'
+                  }
+                  onClick={() => removeRow(i)}
+                >
+                  remove
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button type="button" className="link" onClick={addRow}>
+        + add alias
+      </button>
+      <p className="field-hint">
+        Vendor namespaces let other apps match this symbol — e.g. <code>fsk:</code>{' '}
+        for Freeboard built-ins, <code>custom:</code> for your own symbols. The
+        symbol's identity (uuid) and file never change when aliases are edited.
+      </p>
+    </fieldset>
+  )
+}
+
 export function MetadataFields({
   meta,
   onChange,
   config,
-  editing,
   sections = 'all'
 }: Props) {
   const mapMarker = isMapMarker(meta.roles, config)
@@ -47,27 +123,11 @@ export function MetadataFields({
     <div className="metadata-fields">
       {showIdentity ? (
         <>
-          <label>
-            Id
-            <input
-              value={meta.id}
-              onChange={(e) => onChange({ id: e.target.value })}
-              placeholder="dive-site"
-            />
-          </label>
-          <label>
-            Namespace
-            <input
-              value={meta.namespace}
-              onChange={(e) => onChange({ namespace: e.target.value })}
-            />
-          </label>
-          {editing ? (
-            <p className="field-hint">
-              Changing the id or namespace renames this symbol (and the SVG file
-              on disk). Apps referencing the old id will need updating.
-            </p>
-          ) : null}
+          <AliasEditor
+            alias={meta.alias}
+            defaultNamespace={config.defaultNamespace}
+            onChange={(alias) => onChange({ alias })}
+          />
           <label>
             Name
             <input
@@ -174,13 +234,32 @@ export function MetadataFields({
   )
 }
 
+const NS_RE = /^[A-Za-z0-9_]+$/
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+
 // Validate metadata + svg into a save payload, or return an error string.
 export function buildPayload(
   meta: SymbolMeta,
   svg: string,
   config: AppConfig
 ): string | Record<string, unknown> {
-  if (!meta.id.trim()) return 'id is required'
+  // Aliases: keep non-empty rows, validate each, de-duplicate.
+  const aliasStrings: string[] = []
+  const seen = new Set<string>()
+  for (const r of meta.alias) {
+    const ns = r.namespace.trim()
+    const id = r.id.trim()
+    if (ns === '' && id === '') continue
+    if (!NS_RE.test(ns)) return `alias namespace "${ns}" must match [A-Za-z0-9_]+`
+    if (ns === 'default') return 'alias namespace "default" is reserved'
+    if (!ID_RE.test(id))
+      return `alias id "${id}" must start with a letter/digit and use letters, digits, "-" or "_"`
+    const key = `${ns}:${id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    aliasStrings.push(key)
+  }
+  if (aliasStrings.length === 0) return 'at least one alias is required'
   if (!meta.name.trim()) return 'name is required'
   let scale: number | null = null
   let anchor: [number, number] | null = null
@@ -201,8 +280,7 @@ export function buildPayload(
   if (isMapMarker(meta.roles, config) && anchor === null)
     return 'anchor is required for note / waypoint / map-marker symbols'
   return {
-    id: meta.id.trim(),
-    namespace: meta.namespace.trim() || config.defaultNamespace,
+    alias: aliasStrings,
     name: meta.name.trim(),
     description: meta.description.trim(),
     roles: meta.roles,

@@ -4,7 +4,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { api, fetchSvgText } from './api'
-import { AppConfig, SymbolDraft, SymbolTemplate, SymbolView } from './types'
+import {
+  AliasRow,
+  AppConfig,
+  SymbolDraft,
+  SymbolTemplate,
+  SymbolView,
+  parseAliasRow
+} from './types'
 import { nominalSize } from './svg'
 import { SymbolList } from './components/SymbolList'
 import { TemplatePicker } from './components/TemplatePicker'
@@ -55,13 +62,32 @@ export function App() {
   const anchorStr = (a: [number, number] | null | undefined) =>
     a ? { x: String(a[0]), y: String(a[1]) } : { x: '', y: '' }
 
+  // Slugify a template/type name into a valid local id base, e.g.
+  // "Dive Site" -> "dive-site". Falls back to "symbol".
+  const slugify = (s: string): string =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'symbol'
+
+  // First `<defaultNamespace>:<base><N>` alias not already used by any symbol
+  // (e.g. base "flag" -> "flag1"). Defaults the base to "symbol".
+  const nextDefaultAlias = (base = 'symbol'): AliasRow => {
+    const ns = config?.defaultNamespace || 'custom'
+    const used = new Set<string>()
+    for (const s of symbols) for (const a of s.alias) used.add(a)
+    for (let n = 1; ; n++) {
+      const id = `${base}${n}`
+      if (!used.has(`${ns}:${id}`)) return { namespace: ns, id }
+    }
+  }
+
   // --- New from template --------------------------------------------------
   const pickTemplate = (t: SymbolTemplate) => {
     const n = nominalSize(t.svg)
     const draft: SymbolDraft = {
       mode: 'create',
-      id: '',
-      namespace: config?.defaultNamespace || 'user',
+      alias: [nextDefaultAlias(slugify(t.name))],
       name: t.name,
       description: '',
       roles: t.defaults.roles ?? [],
@@ -91,11 +117,17 @@ export function App() {
       const text = await file.text()
       const result = await api.sanitize(text)
       const n = nominalSize(result.svg)
-      const baseId = file.name.replace(/\.svg$/i, '').replace(/[^A-Za-z0-9_-]/g, '-')
+      const baseId = file.name
+        .replace(/\.svg$/i, '')
+        .replace(/[^A-Za-z0-9_-]/g, '-')
+        .replace(/^[^A-Za-z0-9]+/, '')
       const draft: SymbolDraft = {
         mode: 'create',
-        id: baseId,
-        namespace: config?.defaultNamespace || 'user',
+        alias: [
+          baseId
+            ? { namespace: config?.defaultNamespace || 'custom', id: baseId }
+            : nextDefaultAlias()
+        ],
         name: file.name.replace(/\.svg$/i, ''),
         description: '',
         roles: [],
@@ -124,8 +156,8 @@ export function App() {
       const svgText = await fetchSvgText(s.url)
       const draft: SymbolDraft = {
         mode: 'edit',
-        id: s.id,
-        namespace: s.namespace,
+        uuid: s.uuid,
+        alias: s.alias.length ? s.alias.map(parseAliasRow) : [nextDefaultAlias()],
         name: s.name,
         description: s.description,
         roles: s.roles,
@@ -152,15 +184,15 @@ export function App() {
     setDuplicating(s)
   }
 
-  const doDuplicate = async (newId: string, newNamespace: string) => {
+  const doDuplicate = async (alias: string, newName?: string) => {
     if (!duplicating) return
     setDupError(null)
     setDupBusy(true)
     try {
       const created = await api.duplicate(
-        duplicating.key,
-        newId,
-        newNamespace || undefined
+        duplicating.uuid,
+        alias ? [alias] : undefined,
+        newName
       )
       setDuplicating(null)
       // Refresh so a later Cancel returns to a list that includes the copy,
@@ -175,10 +207,10 @@ export function App() {
   }
 
   const onDelete = async (s: SymbolView) => {
-    if (!window.confirm(`Delete symbol "${s.key}"? This cannot be undone.`)) return
+    if (!window.confirm(`Delete symbol "${s.name}"? This cannot be undone.`)) return
     setError(null)
     try {
-      await api.remove(s.key)
+      await api.remove(s.uuid)
       await refresh()
     } catch (e) {
       setError((e as Error).message)

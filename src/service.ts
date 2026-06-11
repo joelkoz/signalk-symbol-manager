@@ -2,12 +2,16 @@
 // metadata rules, sanitizes SVG, persists through the store, and renders the
 // public `SymbolResource` shape (with `$source` / `timestamp`) for the
 // resources API.
+//
+// A symbol is identified by an immutable `uuid` and referenced by one or more
+// `<namespace>:<id>` aliases. New symbols default to a `custom:symbolNNN` alias.
 
 import {
   Anchor,
   DEFAULT_NAMESPACE,
   MAP_MARKER_ROLES,
   PROVIDER_ID,
+  SymbolAlias,
   SymbolDefinition,
   SymbolInput,
   SymbolRecord,
@@ -17,6 +21,8 @@ import {
 import {
   ValidationError,
   canonicalKey,
+  isUuid,
+  parseAlias,
   parseReference,
   validateLocalId,
   validateNamespace
@@ -77,19 +83,20 @@ export class SymbolService {
 
   // --- shaping ------------------------------------------------------------
 
-  // The asset URL uses the short unqualified id when that id is unique across
-  // the whole library; otherwise it falls back to the canonical `ns:id` form
-  // so the route can always resolve it unambiguously.
+  // Assets are addressed by the immutable uuid, so the URL never changes when a
+  // symbol's aliases are edited.
   assetUrl(record: SymbolRecord): string {
-    const unique = this.store.localIdCount(record.id) === 1
-    const ref = unique ? record.id : canonicalKey(record.namespace, record.id)
-    return `${ASSET_BASE}/${encodeURIComponent(ref)}.svg`
+    return `${ASSET_BASE}/${encodeURIComponent(record.uuid)}.svg`
+  }
+
+  private aliasStrings(record: SymbolRecord): string[] {
+    return record.alias.map((a) => canonicalKey(a.namespace, a.id))
   }
 
   toDefinition(record: SymbolRecord): SymbolDefinition {
     const def: SymbolDefinition = {
-      id: record.id,
-      namespace: record.namespace,
+      uuid: record.uuid,
+      alias: this.aliasStrings(record),
       name: record.name,
       mediaType: 'image/svg+xml',
       url: this.assetUrl(record)
@@ -112,9 +119,15 @@ export class SymbolService {
     }
   }
 
-  // Full record plus computed url, for the manager UI.
-  toManagerView(record: SymbolRecord): SymbolRecord & { url: string } {
-    return { ...record, url: this.assetUrl(record) }
+  // Full record plus computed url, for the manager UI. `alias` is emitted as
+  // canonical "namespace:id" strings (overriding the record's object form) so
+  // the manager UI and the resources API agree on the alias shape.
+  toManagerView(record: SymbolRecord) {
+    return {
+      ...record,
+      alias: this.aliasStrings(record),
+      url: this.assetUrl(record)
+    }
   }
 
   // --- reads --------------------------------------------------------------
@@ -123,22 +136,28 @@ export class SymbolService {
     return this.store.list()
   }
 
+  // The resources collection is keyed by the immutable uuid.
   listResources(): Record<string, SymbolResource> {
     const out: Record<string, SymbolResource> = {}
     for (const record of this.store.list()) {
-      out[canonicalKey(record.namespace, record.id)] = this.toResource(record)
+      out[record.uuid] = this.toResource(record)
     }
     return out
   }
 
-  // Resolve a canonical `ns:id` or an unqualified local id. Throws
-  // ValidationError(404) when missing and ValidationError(409) when ambiguous.
+  // Resolve a uuid, a qualified alias `ns:id`, or an unqualified local id.
+  // Throws ValidationError(404) when missing and (409) when ambiguous.
   resolve(reference: string): SymbolRecord {
-    const { namespace, id } = parseReference(reference)
-    const record =
-      namespace !== undefined
-        ? this.store.get(namespace, id)
-        : this.store.getByLocalId(id)
+    let record: SymbolRecord | undefined
+    if (isUuid(reference)) {
+      record = this.store.getByUuid(reference)
+    } else {
+      const { namespace, id } = parseReference(reference)
+      record =
+        namespace !== undefined
+          ? this.store.getByAlias(namespace, id)
+          : this.store.getByLocalId(id)
+    }
     if (!record) {
       throw new ValidationError(`symbol "${reference}" not found`, 404)
     }
@@ -147,6 +166,48 @@ export class SymbolService {
 
   readSvg(record: SymbolRecord): string {
     return this.store.readAsset(record)
+  }
+
+  // --- alias helpers ------------------------------------------------------
+
+  // Parse and validate the input alias strings into alias pairs. When none are
+  // supplied, default to a single unique `custom:symbolNNN` alias.
+  private resolveInputAliases(value: unknown): SymbolAlias[] {
+    if (value === undefined || value === null) {
+      return [this.nextDefaultAlias()]
+    }
+    if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
+      throw new ValidationError('alias must be an array of strings')
+    }
+    const strings = value as string[]
+    if (strings.length === 0) {
+      return [this.nextDefaultAlias()]
+    }
+    const seen = new Set<string>()
+    const aliases: SymbolAlias[] = []
+    for (const s of strings) {
+      const { namespace, id } = parseAlias(s)
+      validateNamespace(namespace)
+      validateLocalId(id)
+      const key = canonicalKey(namespace, id)
+      if (seen.has(key)) continue
+      seen.add(key)
+      aliases.push({ namespace, id })
+    }
+    if (aliases.length === 0) {
+      throw new ValidationError('at least one alias is required')
+    }
+    return aliases
+  }
+
+  // First `${DEFAULT_NAMESPACE}:symbolNNN` alias not already in use.
+  private nextDefaultAlias(): SymbolAlias {
+    for (let n = 1; ; n++) {
+      const id = `symbol${n}`
+      if (!this.store.getByAlias(DEFAULT_NAMESPACE, id)) {
+        return { namespace: DEFAULT_NAMESPACE, id }
+      }
+    }
   }
 
   // --- writes -------------------------------------------------------------
@@ -203,14 +264,10 @@ export class SymbolService {
   }
 
   create(input: SymbolInput): SymbolRecord {
-    const namespace = validateNamespace(
-      input.namespace || this.opts.defaultNamespace
-    )
-    const id = validateLocalId(input.id)
+    const alias = this.resolveInputAliases(input.alias)
     const meta = this.normalizeMetadata(input, true)
     return this.store.create({
-      id,
-      namespace,
+      alias,
       name: meta.name,
       description: meta.description,
       roles: meta.roles,
@@ -228,22 +285,13 @@ export class SymbolService {
   update(reference: string, input: SymbolInput): SymbolRecord {
     const target = this.resolve(reference)
     const meta = this.normalizeMetadata(input, false)
-    // A save may rename the symbol. When the payload carries an id/namespace
-    // that differs from the resolved target, move the identity (and its asset)
-    // first, then update metadata against the new identity. Absent/blank
-    // id/namespace means "keep current".
-    const newNamespace =
-      typeof input.namespace === 'string' && input.namespace !== ''
-        ? validateNamespace(input.namespace)
-        : target.namespace
-    const newId =
-      typeof input.id === 'string' && input.id !== ''
-        ? validateLocalId(input.id)
-        : target.id
-    if (newNamespace !== target.namespace || newId !== target.id) {
-      this.store.rename(target.namespace, target.id, newNamespace, newId)
-    }
-    return this.store.update(newNamespace, newId, {
+    // Aliases are replaced wholesale; absent means "keep current".
+    const alias =
+      input.alias === undefined
+        ? target.alias
+        : this.resolveInputAliases(input.alias)
+    return this.store.update(target.uuid, {
+      alias,
       name: meta.name,
       description: meta.description,
       roles: meta.roles,
@@ -258,25 +306,12 @@ export class SymbolService {
     })
   }
 
-  duplicate(
-    reference: string,
-    newId: string,
-    newNamespace?: string,
-    newName?: string
-  ): SymbolRecord {
+  duplicate(reference: string, alias?: string[], newName?: string): SymbolRecord {
     const source = this.resolve(reference)
-    const id = validateLocalId(newId)
-    // Default to the source namespace; an explicit namespace lets the copy
-    // reuse the same id under a different namespace (store.create rejects an
-    // exact namespace+id collision with 409).
-    const namespace =
-      typeof newNamespace === 'string' && newNamespace.trim() !== ''
-        ? validateNamespace(newNamespace.trim())
-        : source.namespace
+    const aliases = this.resolveInputAliases(alias)
     const svg = this.store.readAsset(source)
     return this.store.create({
-      id,
-      namespace,
+      alias: aliases,
       name: newName?.trim() || `${source.name} (copy)`,
       description: source.description,
       roles: source.roles,
@@ -293,7 +328,7 @@ export class SymbolService {
 
   delete(reference: string): boolean {
     const target = this.resolve(reference)
-    return this.store.delete(target.namespace, target.id)
+    return this.store.delete(target.uuid)
   }
 
   // Sanitize-only helper for the upload preview flow.

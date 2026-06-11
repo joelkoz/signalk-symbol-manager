@@ -43,8 +43,7 @@ interface Props {
 
 function draftToMeta(draft: SymbolDraft): SymbolMeta {
   return {
-    id: draft.id,
-    namespace: draft.namespace,
+    alias: draft.alias,
     name: draft.name,
     description: draft.description,
     roles: draft.roles,
@@ -965,7 +964,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
     setBusy(true)
     try {
       if (draft.mode === 'create') await api.create(payload)
-      else await api.update(`${draft.namespace}:${draft.id}`, payload)
+      else await api.update(draft.uuid!, payload)
       onSaved()
     } catch (e) {
       setError((e as Error).message)
@@ -995,7 +994,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       />
       <div className="editor-header">
         <h2>
-          {draft.mode === 'create' ? 'New symbol' : `Edit ${draft.namespace}:${draft.id}`}
+          {draft.mode === 'create' ? 'New symbol' : `Edit ${draft.name}`}
         </h2>
         <div className="spacer" />
         <button onClick={onCancel} disabled={busy} className="tip" aria-label="Discard changes and return to the list">
@@ -1136,7 +1135,6 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
                 meta={meta}
                 onChange={updateMeta}
                 config={config}
-                editing={draft.mode === 'edit'}
                 sections="identity"
               />
             </div>
@@ -1178,7 +1176,6 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
                   meta={meta}
                   onChange={updateMeta}
                   config={config}
-                  editing={draft.mode === 'edit'}
                   sections="classification"
                 />
               </>

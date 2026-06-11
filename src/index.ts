@@ -89,8 +89,8 @@ module.exports = (app: SymbolManagerApp): Plugin => {
           type: 'string',
           title: 'Default symbol namespace',
           description:
-            'Namespace assigned to new symbols when none is given. Must match [A-Za-z0-9_]+ and may not be "default".',
-          default: 'user'
+            'Namespace used for the default alias of new symbols when none is given. Must match [A-Za-z0-9_]+ and may not be "default".',
+          default: 'custom'
         },
         maxSvgKb: {
           type: 'number',
@@ -107,7 +107,7 @@ module.exports = (app: SymbolManagerApp): Plugin => {
         maxSvgKb?: number
       }
       const config: PluginConfig = {
-        defaultNamespace: opts.defaultNamespace || 'user',
+        defaultNamespace: opts.defaultNamespace || 'custom',
         maxSvgBytes: Math.max(1, Math.round((opts.maxSvgKb || 256) * 1024)) ||
           DEFAULT_MAX_SVG_BYTES
       }
