@@ -66,7 +66,15 @@ export function SymbolList({
                 </td>
                 <td>
                   <div className="sym-name">{s.name}</div>
-                  <div className="sym-key">{s.key}</div>
+                  {s.alias.length ? (
+                    <div className="sym-aliases">
+                      {s.alias.map((a) => (
+                        <span key={a} className="alias-chip">
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   {s.roles.length ? (
                     <div className="sym-roles">
                       {s.roles.map((r) => (

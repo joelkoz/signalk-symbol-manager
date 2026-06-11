@@ -18,8 +18,13 @@
 import express, { IRouter, Request, Response, Application } from 'express'
 import { SymbolService } from './service'
 import { loadTemplates } from './templates'
-import { canonicalKey, ValidationError } from './symbolKey'
-import { SYMBOL_ROLES, MAP_MARKER_ROLES, SymbolRecord } from './types'
+import { ValidationError } from './symbolKey'
+import {
+  SYMBOL_ROLES,
+  MAP_MARKER_ROLES,
+  DEFAULT_NAMESPACE,
+  SymbolRecord
+} from './types'
 
 type Logger = (msg: string) => void
 type GetService = () => SymbolService
@@ -82,7 +87,7 @@ export function registerManagerApi(
   log: Logger
 ): void {
   const managerView = (record: SymbolRecord) => ({
-    key: canonicalKey(record.namespace, record.id),
+    key: record.uuid,
     ...getService().toManagerView(record)
   })
   const ref = (req: Request) => req.params.ref
@@ -92,7 +97,7 @@ export function registerManagerApi(
 
   api.get('/config', (_req, res) =>
     send(res, log, () => ({
-      defaultNamespace: getService().defaultNamespace,
+      defaultNamespace: getService().defaultNamespace || DEFAULT_NAMESPACE,
       roles: SYMBOL_ROLES,
       mapMarkerRoles: MAP_MARKER_ROLES
     }))
@@ -127,12 +132,7 @@ export function registerManagerApi(
     send(res, log, () => {
       res.status(201)
       return managerView(
-        getService().duplicate(
-          ref(req),
-          req.body?.newId,
-          req.body?.newNamespace,
-          req.body?.newName
-        )
+        getService().duplicate(ref(req), req.body?.alias, req.body?.newName)
       )
     })
   )
