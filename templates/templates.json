@@ -48,6 +48,22 @@
       }
     },
     {
+      "key": "circle",
+      "name": "Circle",
+      "description": "Binnacle style circle marker. Plain colored circle marker with an editable fill color.",
+      "svgFile": "svg/circle.svg",
+      "defaults": {
+        "roles": ["note", "waypoint", "map-marker"],
+        "tags": [],
+        "scale": 0.55,
+        "anchor": [24, 24]
+      },
+      "editor": {
+        "fillTarget": "[data-fill=\"body\"]",
+        "bodyBox": { "x1": 9.5, "y1": 9.5, "x2": 38.5, "y2": 38.5 }
+      }
+    },
+    {
       "key": "blank",
       "name": "Blank",
       "description": "Empty 48x48 canvas to build a symbol from scratch.",

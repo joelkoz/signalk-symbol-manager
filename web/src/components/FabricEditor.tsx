@@ -863,9 +863,7 @@ export function FabricEditor({ draft, config, onSaved, onCancel }: Props) {
       }
       fc.add(group)
       if (anchorRef.current) fc.bringObjectToFront(anchorRef.current)
-      fc.setActiveObject(group)
       fc.requestRenderAll()
-      setSelected(snapshot(group))
       refreshPreview()
       recordHistory()
     } catch (err) {

@@ -199,8 +199,8 @@ export function ShapeProperties({
         </button>
       </div>
       {canFitPoi ? (
-        <button className="tip" onClick={onFitPoi} aria-label="Scale and position this shape into the POI body area">
-          Fit into POI body
+        <button className="tip" onClick={onFitPoi} aria-label="Scale and position this shape inside the template body area">
+          Fit into body
         </button>
       ) : null}
       <button className="danger tip" onClick={onDelete} aria-label="Delete this shape">
