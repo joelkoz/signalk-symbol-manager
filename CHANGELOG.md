@@ -7,17 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3]
+
+### Added
+- "Circle" starter template: a Binnacle-style circle marker with a white fill,
+  blue outline, and a center anchor. Editable fill color, and imported SVGs are
+  sized to fit inside the circle (like the POI body box).
+- SignalK plugin-CI workflow (`.github/workflows/signalk-ci.yml`) that runs the
+  shared cross-platform test matrix.
+- This changelog.
+
+### Changed
+- The editor's "Fit into POI body" action is now "Fit into body" — it applies to
+  any template with an import body box (POI and Circle).
+
 ### Fixed
+- Importing an SVG no longer auto-selects the added object, so the symbol
+  metadata panel (aliases, roles, tags) stays visible after import.
 - Declare `express` as a runtime dependency. The plugin requires `express` to
   register its HTTP API/asset routes; it was previously resolved only
   transitively from signalk-server, so the plugin failed to load when installed
   standalone (for example in the Signal K plugin registry, which installs
   plugins on their own).
-
-### Added
-- SignalK plugin-CI workflow (`.github/workflows/signalk-ci.yml`) that runs the
-  shared cross-platform test matrix.
-- This changelog.
 
 ## [0.6.2]
 
