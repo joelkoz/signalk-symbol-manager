@@ -12,10 +12,7 @@ Before changing or debugging this repository, read:
    verification and test plan.
 3. `MEMORY.md`, if present.
 
-Symbol Manager implementation work is standalone. Use a
-`symbol-resource-provider` branch in this repository only. Do not create
-branches, edit files, or commit changes in `../signalk-server-node` or
-`../freeboard-sk` while working on this plugin.
+Symbol Manager implementation work is standalone. Do not create branches, edit files, or commit changes in `../signalk-server-node`, `../freeboard-sk`, or any directory above or adjacent to where this AGENTS.md file is located while working on this plugin.
 
 ## Repository layout
 
