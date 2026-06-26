@@ -2,7 +2,11 @@
 // id, namespace, name, description, roles (checkboxes), tags (tag editor), and
 // map-marker scale / anchor. Controlled via a `meta` object + `onChange` patch.
 
+import { Fragment, useId, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { TagsInput } from 'react-tag-input-component'
+import { matchingKnownAliases } from '../knownAliases'
+import type { AliasAutocompleteField, KnownAlias } from '../knownAliases'
 import { AliasRow, AppConfig, SymbolMeta } from '../types'
 
 // Which groups of fields to render. The visual editor splits the panel:
@@ -36,12 +40,90 @@ function AliasEditor({
   defaultNamespace: string
   onChange: (alias: AliasRow[]) => void
 }) {
+  const listboxBaseId = useId()
+  const [activeInput, setActiveInput] = useState<{
+    row: number
+    field: AliasAutocompleteField
+  } | null>(null)
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
   const rows = alias.length ? alias : [{ namespace: defaultNamespace, id: '' }]
   const setRow = (i: number, patch: Partial<AliasRow>) =>
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
   const addRow = () =>
     onChange([...rows, { namespace: defaultNamespace, id: '' }])
   const removeRow = (i: number) => onChange(rows.filter((_, idx) => idx !== i))
+  const selectSuggestion = (i: number, suggestion: KnownAlias) => {
+    setRow(i, { namespace: suggestion.namespace, id: suggestion.id })
+    setHighlightedIndex(0)
+    setActiveInput(null)
+  }
+  const activateInput = (row: number, field: AliasAutocompleteField) => {
+    setActiveInput({ row, field })
+    setHighlightedIndex(0)
+  }
+  const onComboKeyDown = (
+    e: KeyboardEvent<HTMLInputElement>,
+    i: number,
+    field: AliasAutocompleteField,
+    suggestions: KnownAlias[]
+  ) => {
+    if (!suggestions.length) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveInput({ row: i, field })
+      setHighlightedIndex((n) => (n + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveInput({ row: i, field })
+      setHighlightedIndex((n) => (n - 1 + suggestions.length) % suggestions.length)
+    } else if (
+      e.key === 'Enter' &&
+      activeInput?.row === i &&
+      activeInput.field === field
+    ) {
+      e.preventDefault()
+      selectSuggestion(i, suggestions[highlightedIndex] ?? suggestions[0])
+    } else if (e.key === 'Escape') {
+      setActiveInput(null)
+      setHighlightedIndex(0)
+    }
+  }
+  const renderCombobox = (
+    i: number,
+    field: AliasAutocompleteField,
+    suggestions: KnownAlias[],
+    listboxId: string
+  ) =>
+    activeInput?.row === i && activeInput.field === field && suggestions.length ? (
+      <div
+        id={listboxId}
+        role="listbox"
+        className="alias-combobox"
+        aria-label={`Known aliases matching row ${i + 1}`}
+      >
+        {suggestions.map((suggestion, idx) => (
+          <div
+            id={`${listboxId}-option-${idx}`}
+            key={suggestion.label}
+            role="option"
+            aria-selected={idx === highlightedIndex}
+            className={
+              idx === highlightedIndex
+                ? 'alias-combobox-option active'
+                : 'alias-combobox-option'
+            }
+            onMouseEnter={() => setHighlightedIndex(idx)}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              selectSuggestion(i, suggestion)
+            }}
+          >
+            <span>{suggestion.namespace}</span>
+            <strong>{suggestion.id}</strong>
+          </div>
+        ))}
+      </div>
+    ) : null
 
   return (
     <fieldset className="alias-editor required">
@@ -55,39 +137,88 @@ function AliasEditor({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              <td>
-                <input
-                  value={r.namespace}
-                  onChange={(e) => setRow(i, { namespace: e.target.value })}
-                  placeholder="custom"
-                />
-              </td>
-              <td>
-                <input
-                  value={r.id}
-                  onChange={(e) => setRow(i, { id: e.target.value })}
-                  placeholder="dive-site"
-                />
-              </td>
-              <td>
-                <button
-                  type="button"
-                  className="link danger"
-                  disabled={rows.length <= 1}
-                  title={
-                    rows.length <= 1
-                      ? 'At least one alias is required'
-                      : 'Remove alias'
-                  }
-                  onClick={() => removeRow(i)}
-                >
-                  remove
-                </button>
-              </td>
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const activeField =
+              activeInput?.row === i ? activeInput.field : undefined
+            const suggestions = activeField
+              ? matchingKnownAliases(r, undefined, activeField)
+              : []
+            const namespaceListboxId = `${listboxBaseId}-alias-${i}-namespace`
+            const idListboxId = `${listboxBaseId}-alias-${i}-id`
+            const open = activeInput?.row === i && suggestions.length > 0
+            return (
+              <Fragment key={i}>
+                <tr>
+                  <td className="alias-combo-cell">
+                    <input
+                      value={r.namespace}
+                      onChange={(e) => {
+                        setRow(i, { namespace: e.target.value })
+                        activateInput(i, 'namespace')
+                      }}
+                      onFocus={() => activateInput(i, 'namespace')}
+                      onBlur={() => window.setTimeout(() => setActiveInput(null), 120)}
+                      onKeyDown={(e) =>
+                        onComboKeyDown(e, i, 'namespace', suggestions)
+                      }
+                      placeholder="custom"
+                      role="combobox"
+                      aria-label={`Alias ${i + 1} namespace`}
+                      aria-autocomplete="list"
+                      aria-controls={namespaceListboxId}
+                      aria-expanded={open && activeField === 'namespace'}
+                      aria-haspopup="listbox"
+                      aria-activedescendant={
+                        open && activeField === 'namespace'
+                          ? `${namespaceListboxId}-option-${highlightedIndex}`
+                          : undefined
+                      }
+                    />
+                    {renderCombobox(i, 'namespace', suggestions, namespaceListboxId)}
+                  </td>
+                  <td className="alias-combo-cell">
+                    <input
+                      value={r.id}
+                      onChange={(e) => {
+                        setRow(i, { id: e.target.value })
+                        activateInput(i, 'id')
+                      }}
+                      onFocus={() => activateInput(i, 'id')}
+                      onBlur={() => window.setTimeout(() => setActiveInput(null), 120)}
+                      onKeyDown={(e) => onComboKeyDown(e, i, 'id', suggestions)}
+                      placeholder="dive-site"
+                      role="combobox"
+                      aria-label={`Alias ${i + 1} id`}
+                      aria-autocomplete="list"
+                      aria-controls={idListboxId}
+                      aria-expanded={open && activeField === 'id'}
+                      aria-activedescendant={
+                        open && activeField === 'id'
+                          ? `${idListboxId}-option-${highlightedIndex}`
+                          : undefined
+                      }
+                    />
+                    {renderCombobox(i, 'id', suggestions, idListboxId)}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="link danger"
+                      disabled={rows.length <= 1}
+                      title={
+                        rows.length <= 1
+                          ? 'At least one alias is required'
+                          : 'Remove alias'
+                      }
+                      onClick={() => removeRow(i)}
+                    >
+                      remove
+                    </button>
+                  </td>
+                </tr>
+              </Fragment>
+            )
+          })}
         </tbody>
       </table>
       <button type="button" className="link" onClick={addRow}>
