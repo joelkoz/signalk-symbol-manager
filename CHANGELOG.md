@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0]
+
+### Added
+- Alias autocomplete: typing in a symbol's `namespace:id` alias field now
+  suggests known vendor aliases (Freeboard-SK and Binnacle symbol names),
+  making it easier to align managed symbols with the consumers that look them
+  up.
+
 ## [0.6.3]
 
 ### Added

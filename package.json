@@ -1,6 +1,6 @@
 {
   "name": "signalk-symbol-manager",
-  "version": "0.6.3",
+  "version": "1.0.0",
   "description": "Create and manage chart symbols (icons for waypoints, notes, etc.)",
   "main": "plugin/index.js",
   "scripts": {
