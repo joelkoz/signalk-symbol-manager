@@ -174,7 +174,7 @@ The `roles` array uses an advisory vocabulary. Known values:
 | `region`            | Associated with a geographic region         |
 | `button`            | Used as a UI button icon                    |
 | `alert`             | Used in alert or alarm contexts             |
-| `logbook`           | Used in logbook entries                     |
+| `generic`           | No specific role; general-purpose symbol    |
 | `vector-style-icon` | Used as an icon in a vector map style       |
 
 Consumers should ignore unknown role values. A symbol may have multiple roles.

@@ -17,7 +17,7 @@ export const SYMBOL_ROLES = [
   'region',
   'button',
   'alert',
-  'logbook',
+  'generic',
   'map-marker',
   'vector-style-icon'
 ] as const

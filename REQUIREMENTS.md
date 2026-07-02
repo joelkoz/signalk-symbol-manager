@@ -412,7 +412,7 @@ A "Properties" panel where the user can edit:
   * roles
      * assigned with checkboxes for the known role vocabulary
      * role checkboxes must include `note`, `waypoint`, `region`, `button`,
-       `alert`, `logbook`, `map-marker`, and `vector-style-icon`
+       `alert`, `generic`, `map-marker`, and `vector-style-icon`
   * tags
      * assigned with a dedicated React tag-input/tag-editor component
      * support adding tags with keyboard delimiters, removing tags, preventing
