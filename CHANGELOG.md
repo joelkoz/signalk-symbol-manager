@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Alias autocomplete now suggests the Freeboard-SK meteo wind-barb symbol names
+  (`fsk:real-weatherStation-5` … `-75` and their `virtual-` counterparts), so a
+  user can override an individual barb glyph. The base `weatherStation` windsock
+  aliases remain listed for the calm / no-wind symbol.
+
 ## [1.0.0]
 
 ### Added
