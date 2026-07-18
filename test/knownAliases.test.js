@@ -98,12 +98,19 @@ test('known alias catalog includes Freeboard-only replaceable ids', () => {
     ),
     ['fsk:vessel-self']
   )
-  assert.deepEqual(
-    matchingKnownAliases({ namespace: 'fsk', id: 'weather' }, 8, 'id').map(
-      (m) => m.label
-    ),
-    ['fsk:real-weatherStation', 'fsk:virtual-weatherStation']
-  )
+  // The catalog also carries a per-speed wind-barb glyph for every barb step
+  // (`-5` … `-75`), so this match is truncated by the limit. Assert the base
+  // windsock pair leads the list rather than pinning the truncated tail.
+  const weather = matchingKnownAliases(
+    { namespace: 'fsk', id: 'weather' },
+    8,
+    'id'
+  ).map((m) => m.label)
+  assert.deepEqual(weather.slice(0, 2), [
+    'fsk:real-weatherStation',
+    'fsk:virtual-weatherStation'
+  ])
+  assert.ok(weather.every((label) => /^fsk:(real|virtual)-weatherStation/.test(label)))
 })
 
 test('known alias catalog does not leak Freeboard-only ids into Binnacle', () => {
