@@ -12,7 +12,7 @@
     "watch:web": "vite build --watch",
     "clean": "rm -rf plugin public/index.html public/assets",
     "test": "npm run build:server && node --test test/*.test.js",
-    "prepare": "npm run build"
+    "prepare": "npm run build 1>&2"
   },
   "keywords": [
     "signalk-node-server-plugin",
