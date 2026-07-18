@@ -7,11 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0]
+
 ### Added
 - Alias autocomplete now suggests the Freeboard-SK meteo wind-barb symbol names
   (`fsk:real-weatherStation-5` … `-75` and their `virtual-` counterparts), so a
   user can override an individual barb glyph. The base `weatherStation` windsock
   aliases remain listed for the calm / no-wind symbol.
+- Alias autocomplete now suggests the Freeboard-SK wind-direction and
+  ocean/tidal current flow arrow names (`fsk:windIndicator-arrow`,
+  `fsk:oceanCurrentIndicator-arrow`, `fsk:tidalCurrentIndicator-arrow`), so
+  those overridable map-marker symbols can be picked instead of typed.
+
+### Fixed
+- `package-lock.json` is back in sync with the declared `express` dependency,
+  so `npm ci` (and therefore CI) succeeds again.
 
 ## [1.0.0]
 
