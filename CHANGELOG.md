@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1]
+
+### Fixed
+- Packaging: the `prepare` build no longer writes to stdout, which had corrupted
+  the JSON emitted by `npm pack` under npm 10 (Node 22) and caused a false
+  "entry point missing from the package" CI failure. No runtime change — the
+  1.2.0 package itself was complete and installable.
+
 ## [1.2.0]
 
 ### Added
